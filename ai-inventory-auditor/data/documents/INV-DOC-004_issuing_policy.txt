@@ -1,0 +1,10 @@
+DOC_ID: INV-DOC-004
+TITLE: Quy trình xuất kho
+VERSION: 1.0
+DATE: 2026-07-15
+OWNER: Warehouse Operations
+
+1. Giao dịch xuất kho dùng transaction_type=OUT.
+2. Quantity được lưu dạng số dương và được trừ khi tính tồn kho.
+3. Chỉ giao dịch status=POSTED mới được tính.
+4. DRAFT, CANCELLED và REJECTED không được tính.

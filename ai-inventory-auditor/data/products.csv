@@ -1,0 +1,45 @@
+﻿product_id,product_name,category,opening_stock,physical_count,unit
+SP001,Cảm biến siêu âm HC-SR04,Sensor,100,80,cái
+SP002,Cảm biến hồng ngoại IR,Sensor,50,52,cái
+SP003,Cảm biến nhiệt độ DHT22,Sensor,75,75,cái
+SP004,Cảm biến ánh sáng LDR,Sensor,40,,cái
+SP005,Cảm biến độ ẩm đất,Sensor,128,,cái
+SP006,Cảm biến chuyển động PIR,Sensor,43,57,cái
+SP007,Cảm biến khí MQ-2,Sensor,174,,cái
+SP008,Cảm biến gia tốc MPU6050,Sensor,70,70,cái
+SP009,Arduino Uno R3,Controller,199,199,cái
+SP010,Arduino Mega 2560,Controller,76,76,cái
+SP011,ESP32 DevKit,Controller,91,91,cái
+SP012,ESP8266 NodeMCU,Controller,21,21,cái
+SP013,Raspberry Pi Pico,Controller,60,60,cái
+SP014,STM32 Blue Pill,Controller,107,102,cái
+SP015,Động cơ DC 5V,Motor,215,215,cái
+SP016,Động cơ DC 12V,Motor,43,43,cái
+SP017,Động cơ giảm tốc 1:48,Motor,111,111,cái
+SP018,Stepper Motor 28BYJ-48,Motor,174,158,cái
+SP019,Driver motor L298N,Motor,206,206,cái
+SP020,Driver motor TB6612FNG,Motor,51,51,cái
+SP021,Servo SG90,Actuator,116,,cái
+SP022,Servo MG996R,Actuator,95,95,cái
+SP023,Relay 5V,Actuator,178,178,cái
+SP024,Bơm mini 5V,Actuator,112,112,cái
+SP025,Solenoid 12V,Actuator,200,,cái
+SP026,Module Bluetooth HC-05,Communication,189,189,cái
+SP027,Module Wi-Fi ESP-01,Communication,40,40,cái
+SP028,Module NRF24L01,Communication,241,240,cái
+SP029,Module RFID RC522,Communication,136,136,cái
+SP030,Module GPS NEO-6M,Communication,113,117,cái
+SP031,Dây jumper đực-cái,Accessory,73,73,đơn vị
+SP032,Dây jumper đực-đực,Accessory,199,199,đơn vị
+SP033,Breadboard 830 điểm,Accessory,185,,đơn vị
+SP034,Điện trở 220 ohm,Accessory,182,179,đơn vị
+SP035,Điện trở 10k ohm,Accessory,61,61,đơn vị
+SP036,LED đỏ 5mm,Accessory,89,89,đơn vị
+SP037,LED xanh 5mm,Accessory,183,183,đơn vị
+SP038,Nút nhấn tact switch,Accessory,76,76,đơn vị
+SP039,Cáp USB Type-B,Accessory,235,235,đơn vị
+SP040,Bánh xe robot 65mm,Mechanical,34,18,cái
+SP041,Khung xe robot 2WD,Mechanical,226,226,cái
+SP042,Bánh xe caster,Mechanical,88,,cái
+SP043,Ốc vít M3,Mechanical,165,165,cái
+SP044,Giá đỡ cảm biến,Mechanical,100,113,cái
