@@ -1,0 +1,14 @@
+DOC_ID: INV-DOC-002
+TITLE: Chính sách kiểm kê tồn kho
+VERSION: 2.0
+DATE: 2026-10-01
+OWNER: Inventory Department
+
+1. Tồn kho dự kiến = tồn đầu kỳ + tổng nhập đã POSTED - tổng xuất đã POSTED trong kỳ.
+2. Nếu tồn thực tế khác tồn dự kiến, tạo phiếu kiểm kê để xác minh.
+3. Chênh lệch tuyệt đối >= 10 đơn vị: mức ưu tiên HIGH.
+4. Chênh lệch tuyệt đối từ 1 đến 9 đơn vị: mức ưu tiên NORMAL.
+5. Chênh lệch bằng 0 thì không tạo phiếu kiểm kê chênh lệch.
+6. Phiếu phải ghi product_id, expected_stock, physical_count, variance, priority và policy_doc_id.
+7. Không kết luận nguyên nhân thất thoát chỉ từ số liệu tồn kho.
+8. Thiếu physical_count hoặc dữ liệu giao dịch thì không được suy đoán; yêu cầu bổ sung.

@@ -1,0 +1,10 @@
+DOC_ID: INV-DOC-001
+TITLE: Chính sách kiểm kê tồn kho
+VERSION: 1.0
+DATE: 2026-08-01
+OWNER: Inventory Department
+
+1. Tồn kho dự kiến = tồn đầu kỳ + tổng nhập đã POSTED - tổng xuất đã POSTED trong kỳ.
+2. Nếu tồn thực tế khác tồn dự kiến, cần tạo phiếu yêu cầu kiểm kê lại.
+3. Phiếu phải có mã sản phẩm, tồn dự kiến, tồn thực tế, chênh lệch và lý do kiểm tra.
+4. Không kết luận nguyên nhân chênh lệch nếu không có bằng chứng bổ sung.

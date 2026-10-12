@@ -1,0 +1,11 @@
+DOC_ID: INV-DOC-007
+TITLE: Quy tắc mức ưu tiên
+VERSION: 1.0
+DATE: 2026-10-01
+OWNER: Inventory Department
+
+Theo chính sách hiện hành INV-DOC-002 version 2.0:
+- abs(variance) >= 10: HIGH.
+- 1 <= abs(variance) <= 9: NORMAL.
+- variance = 0: không tạo phiếu chênh lệch.
+Nếu chính sách khác phiên bản mâu thuẫn, ưu tiên phiên bản có ngày hiệu lực mới hơn.

@@ -1,0 +1,14 @@
+DOC_ID: INV-DOC-005
+TITLE: Từ điển dữ liệu tồn kho
+VERSION: 1.0
+DATE: 2026-07-10
+OWNER: Data Team
+
+product_id: mã sản phẩm duy nhất.
+opening_stock: tồn đầu kỳ.
+physical_count: số lượng đếm thực tế; rỗng nghĩa là chưa có số liệu.
+transaction_type: IN hoặc OUT.
+quantity: số lượng giao dịch, luôn là số dương.
+status: POSTED, DRAFT, CANCELLED hoặc REJECTED.
+expected_stock = opening_stock + tổng IN POSTED - tổng OUT POSTED.
+variance = physical_count - expected_stock.

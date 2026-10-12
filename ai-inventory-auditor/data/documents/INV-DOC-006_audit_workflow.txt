@@ -1,0 +1,12 @@
+DOC_ID: INV-DOC-006
+TITLE: Quy trình xử lý phiếu kiểm kê
+VERSION: 1.0
+DATE: 2026-09-01
+OWNER: Warehouse Operations
+
+1. Chỉ tạo phiếu khi có product_id, expected_stock và physical_count.
+2. Phiếu mới có trạng thái OPEN.
+3. Mỗi phiếu có audit_id, created_at, variance, priority và policy_doc_id.
+4. Sau khi tạo phiếu, hệ thống phải đọc lại bằng audit_id để xác minh bản ghi.
+5. Chỉ thông báo tạo thành công khi đọc lại thấy đúng product_id và trạng thái.
+6. Không tự động sửa tồn kho thực tế từ kết quả kiểm kê.

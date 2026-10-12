@@ -1,0 +1,10 @@
+DOC_ID: INV-DOC-003
+TITLE: Quy trình nhập kho
+VERSION: 1.0
+DATE: 2026-07-15
+OWNER: Warehouse Operations
+
+1. Giao dịch nhập kho dùng transaction_type=IN.
+2. Quantity phải là số nguyên dương.
+3. Chỉ giao dịch status=POSTED mới được tính vào tồn kho.
+4. DRAFT, CANCELLED và REJECTED không được tính.

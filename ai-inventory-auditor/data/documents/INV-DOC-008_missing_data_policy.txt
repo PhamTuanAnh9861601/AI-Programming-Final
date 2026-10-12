@@ -1,0 +1,10 @@
+DOC_ID: INV-DOC-008
+TITLE: Xử lý dữ liệu thiếu
+VERSION: 1.0
+DATE: 2026-09-10
+OWNER: Data Team
+
+1. Nếu physical_count trống, không tính variance và không tạo phiếu.
+2. Nếu thiếu opening_stock hoặc không xác định được giao dịch POSTED trong kỳ, báo không đủ dữ liệu.
+3. Không tự điền số lượng thiếu bằng 0.
+4. Nếu chỉ có số liệu tồn kho mà không có chứng cứ nguyên nhân, không kết luận nguyên nhân chênh lệch.
