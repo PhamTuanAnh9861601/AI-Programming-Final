@@ -137,17 +137,59 @@ class AgentLoop:
             if schema["function"]["name"] in self.tools
         ]
 
+    
+    def _allows_audit_creation(self, question: str) -> bool:
+        """Chỉ cho phép ghi database khi người dùng yêu cầu tạo phiếu rõ ràng."""
+        text = question.lower().strip()
+
+        # Các cách diễn đạt phủ định: không được phép ghi dữ liệu.
+        negative_phrases = [
+            "không tạo phiếu",
+            "không lập phiếu",
+            "đừng tạo phiếu",
+            "chỉ kiểm tra",
+            "chỉ xem",
+            "không ghi dữ liệu",
+        ]
+        if any(phrase in text for phrase in negative_phrases):
+            return False
+
+        # Chỉ cấp quyền ghi khi có yêu cầu tạo/lập phiếu cụ thể.
+        write_phrases = [
+            "tạo phiếu kiểm toán",
+            "lập phiếu kiểm toán",
+            "tạo phiếu audit",
+            "lập phiếu audit",
+            "tạo yêu cầu kiểm toán",
+            "lập yêu cầu kiểm toán",
+            "create audit request",
+        ]
+        return any(phrase in text for phrase in write_phrases)
+
+
+    
     def _execute_tool(
         self,
         tool_name: str,
         arguments: dict[str, Any],
+        allow_write: bool = False,
     ) -> tuple[bool, str]:
-        """Kiểm tra registry rồi thực thi tool."""
+        """Kiểm tra quyền rồi mới thực thi tool."""
+
+        # Chặn ghi dữ liệu nếu người dùng không yêu cầu rõ ràng.
+        if tool_name == "create_audit_request" and not allow_write:
+            return False, (
+                "Error: Không được tạo phiếu kiểm toán vì "
+                "người dùng chưa yêu cầu tạo phiếu."
+            )
+
+        # Kiểm tra tool có tồn tại trong registry không.
         tool = self.tools.get(tool_name)
 
         if tool is None:
             return False, f"Error: Tool '{tool_name}' không tồn tại."
 
+        # Thực thi tool và chuẩn hóa kết quả thành chuỗi.
         try:
             result = tool(**arguments)
 
@@ -165,8 +207,18 @@ class AgentLoop:
         except Exception as exc:
             return False, f"Error: {type(exc).__name__}: {exc}"
 
+
     def run(self, question: str) -> AgentResult:
         """Chạy vòng lặp ReAct cho một câu hỏi."""
+        allow_write = self._allows_audit_creation(question)
+
+        allowed_tools = [
+            schema
+            for schema in self.tool_schemas
+            if allow_write
+            or schema["function"]["name"] != "create_audit_request"
+        ]
+
         messages = [
             {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": question},
@@ -174,12 +226,16 @@ class AgentLoop:
 
         tool_calls_count = 0
 
+        # Theo dõi trạng thái xác minh phiếu kiểm toán.
+        pending_audit_id = None
+        verified_audit_id = None
+
         for step in range(1, self.max_steps + 1):
             try:
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,
-                    tools=self.tool_schemas,
+                    tools=allowed_tools,
                     tool_choice="auto",
                     temperature=0,
                 )
@@ -234,9 +290,41 @@ class AgentLoop:
                             success, output = self._execute_tool(
                                 tool_name,
                                 arguments,
+                                allow_write=allow_write,
                             )
-
                     tool_calls_count += 1
+
+                    # Theo dõi việc tạo phiếu kiểm toán.
+                    if success and tool_name == "create_audit_request":
+                        try:
+                            payload = json.loads(output)
+                            audit = payload.get("audit")
+                    
+
+                            if payload.get("success") is True and isinstance(audit, dict):
+                                audit_id = audit.get("audit_id")
+
+                                if isinstance(audit_id, str) and audit_id.strip():
+                                    pending_audit_id = audit_id
+                                    verified_audit_id = None
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
+
+                    # Chỉ xác nhận khi đọc lại đúng phiếu đang chờ.
+                    elif success and tool_name == "get_audit_request":
+                        try:
+                            payload = json.loads(output)
+                            audit = payload.get("audit")
+
+                            if (
+                                pending_audit_id is not None
+                                and payload.get("success") is True
+                                and isinstance(audit, dict)
+                                and audit.get("audit_id") == pending_audit_id
+                            ):
+                                verified_audit_id = pending_audit_id
+                        except (json.JSONDecodeError, AttributeError):
+                            pass
 
                     # Kết quả phải gắn với đúng tool_call_id.
                     messages.append(
@@ -258,6 +346,22 @@ class AgentLoop:
 
             # Không có tool call: đọc câu trả lời cuối cùng.
             content = message.content or ""
+
+            if (
+                pending_audit_id is not None
+                and verified_audit_id != pending_audit_id
+            ):
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Chưa xác minh được phiếu kiểm toán vừa tạo. "
+                        f"Hãy gọi get_audit_request với audit_id="
+                        f"{json.dumps(pending_audit_id)} để đọc lại đúng phiếu. "
+                        "Không được tuyên bố phiếu đã được xác minh thành công."
+                    ),
+                })
+                continue
+
 
             if content.strip() and finish_reason == "stop":
                 return AgentResult(
