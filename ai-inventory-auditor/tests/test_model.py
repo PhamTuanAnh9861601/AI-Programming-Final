@@ -39,9 +39,9 @@ class Product:
     """Thông tin sản phẩm và tồn đầu kỳ (products.csv)"""
     product_id: str
     product_name: str = ""
-    category: str = ""                    # Đã bổ sung theo products.csv
+    category: str = ""
     opening_stock: int = 0
-    physical_count: Optional[int] = None  # Đã bổ sung để lưu số đếm thực tế
+    physical_count: Optional[int] = None
     unit: str = ""
 
 
@@ -53,8 +53,7 @@ class Transaction:
     transaction_type: TransactionType
     quantity: int
     status: TransactionStatus
-    transaction_date: Optional[datetime] = None 
-
+    transaction_date: Optional[datetime] = None  
 
 @dataclass
 class StockSummary:
@@ -66,6 +65,8 @@ class StockSummary:
     expected_stock: int
     physical_count: Optional[int] = None
     variance: Optional[int] = None
+    unit: str = "cái"            
+    severity: str = "NORMAL"
 
 
 @dataclass
@@ -75,11 +76,14 @@ class AuditTicket:
     expected_stock: int
     physical_count: int
     variance: int
-    priority: AuditPriority
-    policy_doc_id: str
+    severity: str = "NORMAL"
+    reason: str = ""
+    priority: AuditPriority = AuditPriority.NORMAL
+    policy_doc_id: str = "INV-DOC-002"
     audit_id: str = ""
     status: AuditStatus = AuditStatus.OPEN
     created_at: datetime = field(default_factory=datetime.now)
+
 
 
 # 3. TEST MODELS
@@ -113,7 +117,9 @@ if __name__ == "__main__":
         total_out_posted=20,
         expected_stock=130,  # 100 + 50 - 20
         physical_count=80,
-        variance=-50
+        variance=-50,
+        unit="cái",
+        severity="HIGH"
     )
     print(summary)
 

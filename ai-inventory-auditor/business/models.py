@@ -65,6 +65,8 @@ class StockSummary:
     expected_stock: int
     physical_count: Optional[int] = None
     variance: Optional[int] = None
+    unit: str = "cái"            
+    severity: str = "NORMAL"
 
 
 @dataclass
@@ -74,8 +76,10 @@ class AuditTicket:
     expected_stock: int
     physical_count: int
     variance: int
-    priority: AuditPriority
-    policy_doc_id: str
+    severity: str = "NORMAL"
+    reason: str = ""
+    priority: AuditPriority = AuditPriority.NORMAL
+    policy_doc_id: str = "INV-DOC-002"
     audit_id: str = ""
     status: AuditStatus = AuditStatus.OPEN
     created_at: datetime = field(default_factory=datetime.now)
