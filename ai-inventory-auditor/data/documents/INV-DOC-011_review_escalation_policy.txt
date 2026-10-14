@@ -1,0 +1,10 @@
+DOC_ID: INV-DOC-011
+TITLE: Rà soát và chuyển cấp bất thường tồn kho
+VERSION: 1.0
+DATE: 2026-10-14
+OWNER: Inventory Control
+
+1. Mức ưu tiên của phiếu được tính theo chính sách hiện hành INV-DOC-002 v2.0: abs(variance) >= 10 là HIGH; từ 1 đến 9 là NORMAL; bằng 0 không tạo phiếu chênh lệch.
+2. Phiếu chỉ là yêu cầu điều tra; không phải kết luận về nguyên nhân và không tự động điều chỉnh tồn kho.
+3. Bất thường dữ liệu như expected_stock âm cần được đánh dấu để rà soát trước khi diễn giải kết quả như số liệu vận hành bình thường.
+4. Khi thiếu bằng chứng để xác định nguyên nhân hoặc thiếu dữ liệu bắt buộc, yêu cầu bổ sung dữ liệu thay vì tự suy đoán.

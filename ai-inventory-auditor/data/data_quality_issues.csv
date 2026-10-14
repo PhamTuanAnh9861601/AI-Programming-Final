@@ -1,0 +1,3 @@
+issue_id,issue_type,severity,product_id,expected_stock,opening_stock,posted_in,posted_out,physical_count,description
+DQ-SP038,NEGATIVE_EXPECTED_STOCK,HIGH,SP038,-43,76,0,119,76,"Tồn kho dự kiến âm; cần kiểm tra dữ liệu giao dịch, kỳ tính hoặc tồn đầu kỳ. Không tự sửa số liệu nguồn."
+DQ-SP040,NEGATIVE_EXPECTED_STOCK,HIGH,SP040,-38,34,0,72,18,"Tồn kho dự kiến âm; cần kiểm tra dữ liệu giao dịch, kỳ tính hoặc tồn đầu kỳ. Không tự sửa số liệu nguồn."

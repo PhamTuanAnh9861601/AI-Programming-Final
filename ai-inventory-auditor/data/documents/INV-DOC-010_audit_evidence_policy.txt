@@ -1,0 +1,11 @@
+DOC_ID: INV-DOC-010
+TITLE: Yêu cầu bằng chứng cho kết luận kiểm toán
+VERSION: 1.0
+DATE: 2026-10-14
+OWNER: Internal Audit
+
+1. Kết luận về số lượng phải nêu product_id, opening_stock, tổng IN POSTED, tổng OUT POSTED, expected_stock và physical_count nếu có.
+2. Mọi kết luận về nguyên nhân phải có bằng chứng tài liệu hoặc hồ sơ giao dịch độc lập; chênh lệch số lượng không đủ để suy ra nguyên nhân.
+3. Nếu thiếu physical_count, opening_stock hoặc giao dịch cần thiết, nêu rõ trường dữ liệu còn thiếu và không tự điền số 0.
+4. Khi sử dụng chính sách, nêu doc_id và version. Nếu tài liệu mâu thuẫn, chọn bản có version/ngày hiệu lực mới hơn khi metadata hỗ trợ kết luận đó.
+5. Sau thao tác tạo phiếu, đọc lại đúng audit_id và xác nhận product_id, status trước khi thông báo thành công.

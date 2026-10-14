@@ -23,3 +23,10 @@ Fictional coursework data, not real company data.
 - SP002: opening 50, posted IN 10, posted OUT 5, physical 52.
 - SP003: opening 75, posted IN 20, posted OUT 20, physical 75.
 - SP004: physical_count is missing; ask for missing data.
+
+
+## Dataset v2 additions
+- `data_quality_issues.csv` lists negative expected-stock cases for investigation; do not auto-correct them.
+- `documents/INV-DOC-009` through `INV-DOC-011` add data-quality, evidence, and escalation rules with metadata.
+- `tests/testset.jsonl` has 16 draft evaluation cases including 5 `no_answer` cases. Confirm the schema expected by `evaluation/evaluate.py` before using it.
+- `analysis_questions.md` lists useful analyses; `DATASET_CHANGELOG.md` documents the duplicate transaction ID repair.

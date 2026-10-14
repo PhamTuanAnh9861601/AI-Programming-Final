@@ -1,6 +1,7 @@
 
 from email.mime import message
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -166,7 +167,7 @@ class AgentLoop:
         ]
         return any(phrase in text for phrase in write_phrases)
 
-
+    
     
     def _execute_tool(
         self,
@@ -208,6 +209,86 @@ class AgentLoop:
             return False, f"Error: {type(exc).__name__}: {exc}"
 
 
+    def _write_run_log(self, record: dict[str, Any]) -> None:
+        """Lưu log tổng hợp và một file JSONL riêng cho mỗi lần chạy."""
+        log_dir = Path(__file__).resolve().parents[1] / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        # Chuyển bản ghi thành JSON trên một dòng.
+        json_line = json.dumps(
+            record,
+            ensure_ascii=False,
+            default=str,
+        )
+
+        # 1. Ghi vào file JSONL tổng hợp (giữ nguyên chức năng cũ).
+        jsonl_path = log_dir / "agent_runs.jsonl"
+        with jsonl_path.open("a", encoding="utf-8") as file:
+            file.write(json_line + "\n")
+
+        # 2. Tạo file JSONL riêng cho mỗi lần chạy.
+        per_run_dir = log_dir / "per_run"
+        per_run_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = record.get("timestamp", "")
+        safe_timestamp = (
+            timestamp.replace(":", "-").replace(".", "-")
+            if timestamp
+            else "unknown-time"
+        )
+
+        # UUID giúp tránh trùng tên file khi chạy gần như đồng thời.
+        from uuid import uuid4
+
+        run_filename = f"run_{safe_timestamp}_{uuid4().hex[:8]}.jsonl"
+        run_path = per_run_dir / run_filename
+
+        with run_path.open("w", encoding="utf-8", newline="\n") as file:
+            file.write(json_line + "\n")
+
+        # 3. Ghi file JSON dễ đọc (giữ nguyên chức năng cũ).
+        pretty_path = log_dir / "agent_runs_pretty.json"
+        records = []
+
+        if pretty_path.exists():
+            try:
+                records = json.loads(pretty_path.read_text(encoding="utf-8"))
+                if not isinstance(records, list):
+                    records = []
+            except json.JSONDecodeError:
+                records = []
+
+        records.append(record)
+
+        pretty_path.write_text(
+            json.dumps(
+                records,
+                ensure_ascii=False,
+                indent=4,
+                default=str,
+            ),
+            encoding="utf-8",
+        )
+
+
+    
+    def _finish_run(
+        self,
+        result: AgentResult,
+        run_log: dict[str, Any],
+    ) -> AgentResult:
+        """Lưu log cuối cùng rồi trả kết quả Agent."""
+        run_log["steps"] = result.steps
+        run_log["answer"] = result.answer
+        run_log["success"] = result.success
+        run_log["tool_calls_count"] = result.tool_calls
+
+        self._write_run_log(run_log)
+        return result
+
+
+
+
     def run(self, question: str) -> AgentResult:
         """Chạy vòng lặp ReAct cho một câu hỏi."""
         allow_write = self._allows_audit_creation(question)
@@ -226,6 +307,26 @@ class AgentLoop:
 
         tool_calls_count = 0
 
+        
+        
+        run_log = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "question": question,
+            "model": self.model,
+            "steps": 0,
+            "tool_calls": [],
+            "tool_calls_count": 0,
+            "token_usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+            },
+            "answer": "",
+            "success": False,
+        }
+
+
+
         # Theo dõi trạng thái xác minh phiếu kiểm toán.
         pending_audit_id = None
         verified_audit_id = None
@@ -239,14 +340,34 @@ class AgentLoop:
                     tool_choice="auto",
                     temperature=0,
                 )
+
             except Exception as exc:
-                return AgentResult(
-                    question=question,
-                    answer=f"Lỗi khi gọi Groq API: {exc}",
-                    steps=step,
-                    success=False,
-                    tool_calls=tool_calls_count,
+                return self._finish_run(
+                    AgentResult(
+                        question=question,
+                        answer=f"Lỗi khi gọi Groq API: {exc}",
+                        steps=step,
+                        success=False,
+                        tool_calls=tool_calls_count,
+                    ),
+                    run_log,
                 )
+
+            # Ghi log vào file JSONL để debug và phân tích sau này.
+            run_log["steps"] = step
+
+            usage = getattr(response, "usage", None)
+            if usage is not None:
+                run_log["token_usage"]["prompt_tokens"] += (
+                    getattr(usage, "prompt_tokens", 0) or 0
+                )
+                run_log["token_usage"]["completion_tokens"] += (
+                    getattr(usage, "completion_tokens", 0) or 0
+                )
+                run_log["token_usage"]["total_tokens"] += (
+                    getattr(usage, "total_tokens", 0) or 0
+                )
+
 
             message = response.choices[0].message
             finish_reason = response.choices[0].finish_reason
@@ -276,6 +397,7 @@ class AgentLoop:
 
                 for call in message.tool_calls:
                     tool_name = call.function.name
+                    arguments: dict[str, Any] = {}
 
                     try:
                         arguments = json.loads(call.function.arguments or "{}")
@@ -293,6 +415,17 @@ class AgentLoop:
                                 allow_write=allow_write,
                             )
                     tool_calls_count += 1
+
+                    run_log["tool_calls"].append({
+                        "step": step,
+                        "tool_name": tool_name,
+                        "arguments": (
+                            arguments if isinstance(arguments, dict) else {}
+                        ),
+                        "success": success,
+                        "output": output,
+                        "tool_call_id": call.id,
+                    })
 
                     # Theo dõi việc tạo phiếu kiểm toán.
                     if success and tool_name == "create_audit_request":
@@ -364,32 +497,41 @@ class AgentLoop:
 
 
             if content.strip() and finish_reason == "stop":
-                return AgentResult(
-                    question=question,
-                    answer=content.strip(),
-                    steps=step,
-                    success=True,
-                    tool_calls=tool_calls_count,
+                return self._finish_run(
+                    AgentResult(
+                        question=question,
+                        answer=content.strip(),
+                        steps=step,
+                        success=True,
+                        tool_calls=tool_calls_count,
+                    ),
+                    run_log,
                 )
 
-            return AgentResult(
-                question=question,
-                answer=(
-                    "Model không trả về câu trả lời cuối cùng hợp lệ. "
-                    f"finish_reason={finish_reason}"
+            return self._finish_run(
+                AgentResult(
+                    question=question,
+                    answer=(
+                        "Model không trả về câu trả lời cuối cùng hợp lệ. "
+                        f"finish_reason={finish_reason}"
+                    ),
+                    steps=step,
+                    success=False,
+                    tool_calls=tool_calls_count,
                 ),
-                steps=step,
-                success=False,
-                tool_calls=tool_calls_count,
+                run_log,
             )
 
-        return AgentResult(
-            question=question,
-            answer=(
-                f"Agent đã đạt giới hạn {self.max_steps} bước "
-                "mà chưa hoàn thành yêu cầu."
+        return self._finish_run(
+            AgentResult(
+                question=question,
+                answer=(
+                    f"Agent đã đạt giới hạn {self.max_steps} bước "
+                    "mà chưa hoàn thành yêu cầu."
+                ),
+                steps=self.max_steps,
+                success=False,
+                tool_calls=tool_calls_count,
             ),
-            steps=self.max_steps,
-            success=False,
-            tool_calls=tool_calls_count,
+            run_log,
         )
