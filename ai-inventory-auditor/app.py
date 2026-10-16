@@ -1,26 +1,33 @@
 
-from tools.inventory_tools import build_tool_registry
 from agent.agent_loop import AgentLoop
+from tools.mcp_client import MCPClient
 
 
 def main():
-    # 1. Đăng ký các tool nghiệp vụ
-    tools = build_tool_registry()
-
-    # 2. Khởi tạo Agent với registry
-    agent = AgentLoop(tools=tools)
-
-    # 3. Nhận câu hỏi từ người dùng
     question = input("Nhập câu hỏi kiểm toán tồn kho: ").strip()
 
     if not question:
         print("Vui lòng nhập câu hỏi.")
         return
 
-    # 4. Chạy vòng lặp ReAct
-    result = agent.run(question)
+    try:
+        with MCPClient() as mcp_client:
+            print(
+                "Đã kết nối MCP. Tool khả dụng: "
+                + ", ".join(mcp_client.available_tools)
+            )
 
-    # 5. Hiển thị kết quả
+            agent = AgentLoop(
+                tools=mcp_client.build_tool_registry(),
+                tool_schemas=mcp_client.get_groq_tool_schemas(),
+            )
+
+            result = agent.run(question)
+
+    except Exception as exc:
+        print(f"Không thể khởi chạy MCP client/server: {exc}")
+        return
+
     print("\n===== KẾT QUẢ AGENT =====")
     print(result.answer)
     print(f"Số bước: {result.steps}")

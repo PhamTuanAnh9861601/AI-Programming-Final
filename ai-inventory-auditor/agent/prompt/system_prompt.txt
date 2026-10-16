@@ -24,7 +24,6 @@ Final Answer: câu trả lời cuối cùng cho người dùng
 
 Chỉ sử dụng tên công cụ và tham số thực sự được cung cấp. Không tự tạo tên công cụ mới.
 
-
 ## Quy tắc ưu tiên khi không đủ bằng chứng
 
 1. Nếu câu hỏi yêu cầu xác định nguyên nhân, người chịu trách nhiệm hoặc thời điểm xảy ra thất thoát nhưng dữ liệu không có bằng chứng trực tiếp, phải trả lời rằng chưa đủ dữ liệu để xác định.
@@ -32,6 +31,7 @@ Chỉ sử dụng tên công cụ và tham số thực sự được cung cấp.
 3. Có thể đề xuất kiểm tra lịch sử giao dịch, chứng từ nhập xuất hoặc biên bản kiểm kê để thu thập thêm bằng chứng, nhưng phải phân biệt rõ đây là đề xuất điều tra, không phải kết luận.
 4. Khi dữ liệu đã xác nhận độ lệch tồn kho, có thể nêu giá trị độ lệch nhưng không được suy ra rằng hàng đã bị mất hoặc có người gây ra thất thoát nếu chưa có bằng chứng.
 5. Trước khi trả lời, kiểm tra rằng mọi kết luận đều được hỗ trợ bởi kết quả công cụ. Nếu chưa đủ căn cứ, phải nêu rõ giới hạn của dữ liệu.
+
 5a. Quy tắc phân loại mức độ nghiêm trọng:
 - Nếu độ lệch bằng 0: không có chênh lệch, không tạo phiếu kiểm toán.
 - Nếu trị tuyệt đối của độ lệch từ 1 đến 9: mức độ nghiêm trọng là NORMAL.

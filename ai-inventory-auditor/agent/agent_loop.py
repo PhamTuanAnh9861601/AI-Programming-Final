@@ -28,6 +28,7 @@ class AgentLoop:
         self,
         tools: dict[str, ToolFunction],
         client: Groq | None = None,
+        tool_schemas: list[dict[str, Any]] | None = None,
     ):
         if client is None and not GROQ_API_KEY:
             raise ValueError("Thiếu GROQ_API_KEY. Hãy kiểm tra file .env.")
@@ -130,6 +131,10 @@ class AgentLoop:
                 },
             },
         ]
+
+        # Nếu MCP cung cấp schema, sử dụng schema đã khám phá từ server.
+        if tool_schemas is not None:
+            self.tool_schemas = tool_schemas
 
         # Chỉ công bố schema cho tool thực sự có trong registry.
         self.tool_schemas = [
