@@ -31,3 +31,4 @@ class AgentResult:
     steps: int
     success: bool
     tool_calls: int
+    token_usage: dict[str, int] | None = None

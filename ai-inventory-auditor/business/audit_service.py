@@ -10,7 +10,7 @@ class AuditService:
         self.inventory_service = InventoryService()
         self.audit_repository = AuditRepository()
 
-    def audit_product(self, product_id: str) -> dict:
+    def audit_product(self, product_id: str, reason: str | None = None) -> dict:
         """Kiểm tra tồn kho và tạo phiếu nếu có chênh lệch."""
 
         # 1. Tính tồn kho từ dữ liệu CSV.
@@ -31,6 +31,14 @@ class AuditService:
             )
             return result
 
+        # 2b. Dữ liệu bất thường (tồn âm): phải điều tra dữ liệu trước (INV-DOC-009).
+        if inventory.data_quality_flag:
+            result["message"] = (
+                f"Dữ liệu bất thường ({inventory.data_quality_flag}). "
+                "Cần điều tra chất lượng dữ liệu trước; không tạo phiếu."
+            )
+            return result
+
         # 3. Không tạo phiếu nếu tồn kho thực tế khớp dự kiến.
         if inventory.variance == 0:
             result["message"] = (
@@ -46,10 +54,8 @@ class AuditService:
             physical_count=inventory.physical_count,
             variance=inventory.variance,
             severity=inventory.severity,
-            reason=(
-                f"Chênh lệch tồn kho: {inventory.variance:g} "
-                f"{inventory.unit}."
-            ),
+            reason=(reason.strip() if reason and reason.strip() else
+                f"Chênh lệch tồn kho: {inventory.variance:g} {inventory.unit}."),
         )
 
         # Repository đã đọc lại phiếu sau khi ghi.

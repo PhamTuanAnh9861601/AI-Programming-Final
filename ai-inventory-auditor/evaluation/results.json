@@ -1,133 +1,487 @@
 {
-  "timestamp": "2026-10-16T17:31:01.797714+00:00",
-  "testset": "C:\\Users\\Admin\\AIproj\\AI-Programming-Final\\ai-inventory-auditor\\tests\\testset.jsonl",
-  "total": 12,
-  "run": 12,
-  "passed": 12,
-  "failed": 0,
+  "timestamp": "2026-10-17T21:26:37.789754+00:00",
+  "testset": "C:\\Users\\Admin\\AIproj\\ai-inventory-auditor\\data\\tests\\testset.jsonl",
+  "total": 18,
+  "run": 18,
+  "passed": 17,
+  "failed": 1,
   "errors": 0,
   "skipped": 0,
-  "pass_rate_on_run": 100.0,
+  "pass_rate_on_run": 94.44,
+  "mean_doc_id_recall": 0.3796,
+  "mean_faithfulness_proxy": 0.1751,
   "results": [
     {
-      "id": "eval_001",
-      "question": "Kiểm tra tồn kho SP001, cho biết tồn kho dự kiến, số lượng thực tế và độ lệch.",
+      "id": "Q01",
+      "question": "Tính tồn kho dự kiến và độ lệch của SP001.",
       "status": "PASSED",
-      "reason": "Các giá trị tồn kho khớp testset.",
-      "answer": "Final Answer: Tồn kho dự kiến của SP001 là 85.0 cái, số lượng thực tế (physical count) là 80.0 cái, độ lệch là -5.0 cái.",
+      "reason": "Các giá trị tồn kho kỳ vọng khớp và có kiểm tra bằng chứng.",
+      "answer": "Tồn kho dự kiến của SP001 là **85.0 cái**.  \nĐộ lệch (variance) so với số kiểm đếm là **-5.0 cái**.",
       "steps": 2,
       "tool_calls": 1,
-      "agent_success": true
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-002",
+        "INV-DOC-005"
+      ],
+      "actual_doc_ids": [],
+      "doc_id_recall": 0.0,
+      "faithfulness_proxy": 0.0,
+      "token_usage": {
+        "prompt_tokens": 2976,
+        "completion_tokens": 536,
+        "total_tokens": 3512,
+        "max_prompt": 1558
+      },
+      "estimated_cost_usd": null
     },
     {
-      "id": "eval_002",
-      "question": "Kiểm tra tồn kho SP002, cho biết tồn kho dự kiến, số lượng thực tế và độ lệch.",
+      "id": "Q02",
+      "question": "Vì sao giao dịch IN 10 của SP001 không làm tăng tồn kho dự kiến?",
       "status": "PASSED",
-      "reason": "Các giá trị tồn kho khớp testset.",
-      "answer": "Final Answer: Tồn kho dự kiến của SP002 là 55.0 cái, số lượng thực tế (physical count) là 52.0 cái, độ lệch là -3.0 cái.",
-      "steps": 2,
-      "tool_calls": 1,
-      "agent_success": true
+      "reason": "Đạt kiểm tra nội dung sơ bộ và trích dẫn ít nhất một tài liệu kỳ vọng.",
+      "answer": "Giao dịch IN 10 của SP001 không làm tăng tồn kho dự kiến vì trạng thái của giao dịch là **DRAFT**, không được tính vào tồn kho.  \n\n- Theo chính sách kho: “Chỉ giao dịch status=POSTED mới được tính vào tồn kho.” [doc_id=INV-DOC-003, version=1.0, date=2026-07-15]  \n- Giao dịch TX90254 (IN 10) có status DRAFT và `counted_in_stock: false` trong dữ liệu giao dịch. [get_transactions]",
+      "steps": 4,
+      "tool_calls": 2,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-003",
+        "INV-DOC-005",
+        "INV-DOC-002"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-003"
+      ],
+      "doc_id_recall": 0.3333333333333333,
+      "faithfulness_proxy": 0.3333,
+      "token_usage": {
+        "prompt_tokens": 7960,
+        "completion_tokens": 729,
+        "total_tokens": 8689,
+        "max_prompt": 2303
+      },
+      "estimated_cost_usd": null
     },
     {
-      "id": "eval_003",
-      "question": "Kiểm tra tồn kho SP003, cho biết tồn kho dự kiến, số lượng thực tế và độ lệch. Chỉ xem dữ liệu, không tạo phiếu kiểm toán.",
+      "id": "Q03",
+      "question": "Tính tồn kho SP003 và cho biết có cần tạo phiếu chênh lệch không.",
       "status": "PASSED",
-      "reason": "Các giá trị tồn kho khớp testset.",
-      "answer": "Final Answer: Tồn kho dự kiến của SP003 là **75** cái, số lượng thực tế (physical count) cũng là **75** cái, do đó độ lệch là **0** cái.",
-      "steps": 2,
-      "tool_calls": 1,
-      "agent_success": true
+      "reason": "Các giá trị tồn kho kỳ vọng khớp và có kiểm tra bằng chứng.",
+      "answer": "Tồn kho dự kiến của SP003 là **75.0** (đã tính từ số liệu nhập/xuất POSTED).  \nSố kiểm đếm thực tế cũng là **75.0**, nên độ lệch (variance) = **0.0**.\n\nTheo chính sách kiểm kê tồn kho:  \n- “Chênh lệch bằng 0 thì không tạo phiếu kiểm kê chênh lệch.” [doc_id=INV-DOC-002, version=2.0, date=2026-10-01]  \n- “- variance = 0: không tạo phiếu chênh lệch.” [doc_id=INV-DOC-007, version=1.0, date=2026-10-01]\n\nVì vậy, **không cần tạo phiếu chênh lệch** cho SP003.",
+      "steps": 4,
+      "tool_calls": 2,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-002",
+        "INV-DOC-005"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-002",
+        "INV-DOC-007"
+      ],
+      "doc_id_recall": 0.5,
+      "faithfulness_proxy": 0.3333,
+      "token_usage": {
+        "prompt_tokens": 7812,
+        "completion_tokens": 773,
+        "total_tokens": 8585,
+        "max_prompt": 2229
+      },
+      "estimated_cost_usd": null
     },
     {
-      "id": "eval_004",
-      "question": "Kiểm tra SP004. Có thể xác định độ lệch tồn kho không?",
+      "id": "Q04",
+      "question": "Có thể tạo phiếu cho SP004 không, và vì sao?",
       "status": "PASSED",
       "reason": "Đúng: thiếu physical_count nên chưa xác định variance.",
-      "answer": "Final Answer: Không thể xác định độ lệch tồn kho cho SP004 vì chưa có dữ liệu kiểm đếm thực tế (`physical_count` là null). Để tính độ lệch, cần có số lượng kiểm đếm thực tế để so sánh với tồn kho dự kiến.",
+      "answer": "Không thể tạo phiếu kiểm kê cho SP004. Theo chính sách kiểm kê tồn kho, khi `physical_count` trống thì không tính variance và không tạo phiếu kiểm kê [doc_id=INV-DOC-008, version=1.0, date=2026-09-10]. Ngoài ra, dữ liệu tồn kho cho SP004 cũng không có `physical_count` nên không đủ điều kiện để lập phiếu.",
+      "steps": 3,
+      "tool_calls": 2,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-008",
+        "INV-DOC-006"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-008"
+      ],
+      "doc_id_recall": 0.5,
+      "faithfulness_proxy": 0.3333,
+      "token_usage": {
+        "prompt_tokens": 5569,
+        "completion_tokens": 509,
+        "total_tokens": 6078,
+        "max_prompt": 2141
+      },
+      "estimated_cost_usd": null
+    },
+    {
+      "id": "Q05",
+      "question": "SP006 có expected_stock bao nhiêu và variance bao nhiêu?",
+      "status": "PASSED",
+      "reason": "Các giá trị tồn kho kỳ vọng khớp và có kiểm tra bằng chứng.",
+      "answer": "SP006 có expected_stock là **74.0** và variance là **-17.0** (được lấy từ dữ liệu công cụ `get_stock_data`).",
       "steps": 2,
       "tool_calls": 1,
-      "agent_success": true
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-002",
+        "INV-DOC-005"
+      ],
+      "actual_doc_ids": [],
+      "doc_id_recall": 0.0,
+      "faithfulness_proxy": 0.0,
+      "token_usage": {
+        "prompt_tokens": 2972,
+        "completion_tokens": 361,
+        "total_tokens": 3333,
+        "max_prompt": 1554
+      },
+      "estimated_cost_usd": null
     },
     {
-      "id": "eval_005",
-      "question": "Liệt kê các sản phẩm có độ lệch tồn kho khác 0 dựa trên dữ liệu hiện có.",
+      "id": "Q06",
+      "question": "SP002 có độ lệch -3 thì mức ưu tiên là gì?",
       "status": "PASSED",
-      "reason": "Có đủ các mã sản phẩm kỳ vọng.",
-      "answer": "**Sản phẩm có độ lệch tồn kho khác 0 (dựa trên dữ liệu hiện có)**  \n\n| Mã sản phẩm | Tên sản phẩm | Độ lệch (variance) | Mức độ nghiêm trọng |\n|-------------|--------------|--------------------|---------------------|\n| SP001 | Cảm biến siêu âm HC‑SR04 | -5 | NORMAL |\n| SP002 | Cảm biến hồng ngoại IR | -3 | NORMAL |\n| SP006 | Cảm biến chuyển động PIR | -17 | HIGH |\n| SP008 | Cảm biến gia tốc MPU6050 | -39 | HIGH |\n| SP009 | Arduino Uno R3 | -35 | HIGH |\n| SP010 | Arduino Mega 2560 | 53 | HIGH |\n| SP011 | ESP32 DevKit | -11 | HIGH |\n| SP012 | ESP8266 NodeMCU | -25 | HIGH |\n| SP013 | Raspberry Pi Pico | -50 | HIGH |\n| SP014 | STM32 Blue Pill | 36 | HIGH |\n| SP015 | Động cơ DC 5V | 43 | HIGH |\n| SP016 | Động cơ DC 12V | -32 | HIGH |\n| SP017 | Động cơ giảm tốc 1:48 | 73 | HIGH |\n| SP018 | Stepper Motor 28BYJ‑48 | 5 | NORMAL |\n| SP019 | Driver motor L298N | -113 | HIGH |\n| SP020 | Driver motor TB6612FNG | -19 | HIGH |\n| SP022 | Servo MG996R | 60 | HIGH |\n| SP023 | Relay 5V | 24 | HIGH |\n| SP024 | Bơm mini 5V | 39 | HIGH |\n| SP026 | Module Bluetooth HC‑05 | 37 | HIGH |\n| SP027 | Module Wi‑Fi ESP‑01 | 5 | NORMAL |\n| SP028 | Module NRF24L01 | -32 | HIGH |\n| SP029 | Module RFID RC522 | 45 | HIGH |\n| SP030 | Module GPS NEO‑6M | 62 | HIGH |\n| SP031 | Dây jumper đực‑cái | -25 | HIGH |\n| SP032 | Dây jumper đực‑đực | 73 | HIGH |\n| SP034 | Điện trở 220 ohm | 20 | HIGH |\n| SP035 | Điện trở 10k ohm | -28 | HIGH |\n| SP036 | LED đỏ 5mm | -96 | HIGH |\n| SP037 | LED xanh 5mm | 26 | HIGH |\n| SP038 | Nút nhấn tact switch | 119 | HIGH |\n| SP039 | Cáp USB Type‑B | 28 | HIGH |\n| SP040 | Bánh xe robot 65mm | 56 | HIGH |\n| SP041 | Khung xe robot 2WD | -12 | HIGH |\n| SP043 | Ốc vít M3 | -14 | HIGH |\n| SP044 | Giá đỡ cảm biến | -68 | HIGH |\n\n> **Lưu ý**: Các sản phẩm có `variance` là `null` hoặc `0` không được liệt kê ở đây.",
+      "reason": "Đạt kiểm tra nội dung sơ bộ và trích dẫn ít nhất một tài liệu kỳ vọng.",
+      "answer": "Độ lệch tuyệt đối 3 đơn vị thuộc khoảng 1–9 đơn vị, vì vậy mức ưu tiên là **NORMAL**.  \n[doc_id=INV-DOC-002, version=2.0, date=2026-10-01]",
       "steps": 2,
       "tool_calls": 1,
-      "agent_success": true
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-002",
+        "INV-DOC-007"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-002"
+      ],
+      "doc_id_recall": 0.5,
+      "faithfulness_proxy": 0.0,
+      "token_usage": {
+        "prompt_tokens": 3433,
+        "completion_tokens": 345,
+        "total_tokens": 3778,
+        "max_prompt": 2014
+      },
+      "estimated_cost_usd": null
     },
     {
-      "id": "eval_006",
-      "question": "SP001 có độ lệch -5 cái. Theo quy tắc phân loại hiện tại, mức độ nghiêm trọng là gì?",
+      "id": "Q07",
+      "question": "Chính sách hiện hành quy định thế nào khi độ lệch tuyệt đối bằng 10?",
       "status": "PASSED",
-      "reason": "Đúng mức độ nghiêm trọng: NORMAL.",
-      "answer": "Final Answer: Mức độ nghiêm trọng là **NORMAL**.",
-      "steps": 1,
-      "tool_calls": 0,
-      "agent_success": true
-    },
-    {
-      "id": "eval_007",
-      "question": "Tồn kho SP003 không có độ lệch. Có cần tạo phiếu kiểm toán không?",
-      "status": "PASSED",
-      "reason": "Đúng chính sách không tạo phiếu.",
-      "answer": "Final Answer: Không cần tạo phiếu kiểm toán vì tồn kho SP003 không có độ lệch (variance = 0).",
+      "reason": "Các giá trị tồn kho kỳ vọng khớp và có kiểm tra bằng chứng.",
+      "answer": "Chính sách hiện hành quy định khi độ lệch tuyệt đối bằng 10 đơn vị thì mức ưu tiên là **HIGH**.  \n[doc_id=INV-DOC-002, version=2.0, date=2026-10-01]",
       "steps": 2,
       "tool_calls": 1,
-      "agent_success": true
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-002",
+        "INV-DOC-007"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-002"
+      ],
+      "doc_id_recall": 0.5,
+      "faithfulness_proxy": 0.0,
+      "token_usage": {
+        "prompt_tokens": 3442,
+        "completion_tokens": 224,
+        "total_tokens": 3666,
+        "max_prompt": 2019
+      },
+      "estimated_cost_usd": null
     },
     {
-      "id": "eval_008",
-      "question": "Tại sao tồn kho thực tế của SP001 thấp hơn tồn kho dự kiến?",
+      "id": "Q08",
+      "question": "Nếu số liệu tồn kho lệch -17 thì có thể kết luận nhân viên làm mất hàng không?",
+      "status": "FAILED",
+      "reason": "Chưa nêu giới hạn bằng chứng hoặc nhu cầu điều tra.",
+      "answer": "Không, việc tồn kho lệch -17 không tự động cho thấy nhân viên đã làm mất hàng. Theo chính sách kiểm kê tồn kho (doc_id=INV-DOC-002, version=2.0, date=2026-10-01) có quy định:\n\n- Khi tồn thực tế khác tồn dự kiến, **tạo phiếu kiểm kê để xác minh** nhưng **phiếu chỉ là yêu cầu điều tra** và **không phải kết luận về nguyên nhân**.  \n- Phiếu kiểm kê không tự động sửa tồn kho thực tế và không đưa ra kết luận về trách nhiệm của nhân viên.  \n\nDo đó, cần thực hiện phiếu kiểm kê và điều tra thêm (xem giao dịch, camera, báo cáo, v.v.) trước khi đưa ra bất kỳ kết luận nào về mất hàng.",
+      "steps": 2,
+      "tool_calls": 1,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-002",
+        "INV-DOC-009",
+        "INV-DOC-010"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-002"
+      ],
+      "doc_id_recall": 0.3333333333333333,
+      "faithfulness_proxy": 0.2,
+      "token_usage": {
+        "prompt_tokens": 3448,
+        "completion_tokens": 436,
+        "total_tokens": 3884,
+        "max_prompt": 2023
+      },
+      "estimated_cost_usd": null
+    },
+    {
+      "id": "Q09",
+      "question": "Sau khi tạo phiếu, cần làm gì để chứng minh phiếu đã được lưu?",
+      "status": "PASSED",
+      "reason": "Đạt kiểm tra nội dung sơ bộ và trích dẫn ít nhất một tài liệu kỳ vọng.",
+      "answer": "Sau khi tạo phiếu kiểm kê, bạn cần **đọc lại phiếu bằng `audit_id`** để xác minh rằng bản ghi đã được lưu trong hệ thống.  \n\nTheo chính sách quy trình:\n\n- “Sau khi tạo phiếu, hệ thống phải đọc lại bằng audit_id để xác minh bản ghi.” [doc_id=INV-DOC-006, version=1.0, date=2026-09-01]",
+      "steps": 4,
+      "tool_calls": 1,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-006",
+        "INV-DOC-010"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-006"
+      ],
+      "doc_id_recall": 0.5,
+      "faithfulness_proxy": 0.3333,
+      "token_usage": {
+        "prompt_tokens": 7120,
+        "completion_tokens": 1054,
+        "total_tokens": 8174,
+        "max_prompt": 2153
+      },
+      "estimated_cost_usd": null
+    },
+    {
+      "id": "Q10",
+      "question": "Tồn kho dự kiến âm có được tự động sửa opening_stock không?",
+      "status": "PASSED",
+      "reason": "Đạt kiểm tra nội dung sơ bộ và trích dẫn ít nhất một tài liệu kỳ vọng.",
+      "answer": "Không, khi tồn kho dự kiến âm hệ thống **không tự động sửa** `opening_stock` hoặc `quantity`.  \n[doc_id=INV-DOC-009, version=1.0, date=2026-10-14]",
+      "steps": 2,
+      "tool_calls": 1,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-009",
+        "INV-DOC-011"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-009"
+      ],
+      "doc_id_recall": 0.5,
+      "faithfulness_proxy": 0.0,
+      "token_usage": {
+        "prompt_tokens": 3464,
+        "completion_tokens": 225,
+        "total_tokens": 3689,
+        "max_prompt": 2045
+      },
+      "estimated_cost_usd": null
+    },
+    {
+      "id": "Q11",
+      "question": "Tổng chi phí nhập kho bằng tiền của SP001 trong tháng là bao nhiêu?",
       "status": "PASSED",
       "reason": "Từ chối kết luận khi chưa đủ dữ liệu.",
-      "answer": "Final Answer: Dữ liệu cho thấy SP001 có tồn kho dự kiến là 85, số lượng kiểm đếm thực tế là 80, chênh lệch -5 đơn vị (độ nghiêm trọng NORMAL). Tuy nhiên, hiện tại chưa có bằng chứng trực tiếp để xác định nguyên nhân của sự chênh lệch này. Bạn có thể kiểm tra lịch sử giao dịch, chứng từ nhập xuất và biên bản kiểm kê để thu thập thêm dữ liệu và xác định nguyên nhân cụ thể.",
-      "steps": 2,
+      "answer": "Không tìm thấy trong tài liệu. Các tài liệu chính sách kho mà tôi tra cứu không ghi rõ thông tin về chi phí nhập kho (đơn vị tiền) của SP001 trong tháng. Hệ thống hiện không lưu trữ dữ liệu chi phí nhập kho theo sản phẩm, vì vậy tôi không thể cung cấp số liệu đó.",
+      "steps": 3,
       "tool_calls": 1,
-      "agent_success": true
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-005"
+      ],
+      "actual_doc_ids": [],
+      "doc_id_recall": 0.0,
+      "faithfulness_proxy": 0.0,
+      "token_usage": {
+        "prompt_tokens": 4962,
+        "completion_tokens": 646,
+        "total_tokens": 5608,
+        "max_prompt": 2067
+      },
+      "estimated_cost_usd": null
     },
     {
-      "id": "eval_009",
-      "question": "Cho biết số lượng kiểm đếm thực tế của sản phẩm SP999.",
+      "id": "Q12",
+      "question": "Ai là nhân viên chịu trách nhiệm làm thất thoát SP006?",
       "status": "PASSED",
       "reason": "Từ chối kết luận khi chưa đủ dữ liệu.",
-      "answer": "Final Answer: Không có dữ liệu tồn kho thực tế cho sản phẩm SP999 trong hệ thống. Bạn có thể kiểm tra lại mã sản phẩm hoặc yêu cầu truy xuất dữ liệu từ nguồn khác.",
+      "answer": "Không có bằng chứng trong tài liệu xác định nhân viên chịu trách nhiệm làm thất thoát cho SP006. Theo chính sách kiểm kê tồn kho, việc kết luận nguyên nhân thất thoát chỉ dựa trên số liệu tồn kho là không được phép; cần có chứng cứ độc lập và quy trình điều tra cụ thể.  \n[doc_id=INV-DOC-002, version=2.0, date=2026-10-01]",
       "steps": 2,
       "tool_calls": 1,
-      "agent_success": true
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-009",
+        "INV-DOC-010"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-002"
+      ],
+      "doc_id_recall": 0.0,
+      "faithfulness_proxy": 0.0,
+      "token_usage": {
+        "prompt_tokens": 3462,
+        "completion_tokens": 385,
+        "total_tokens": 3847,
+        "max_prompt": 2044
+      },
+      "estimated_cost_usd": null
     },
     {
-      "id": "eval_010",
-      "question": "Ai là người làm thất thoát 5 cái của SP001?",
+      "id": "Q13",
+      "question": "Camera kho ghi nhận ai lấy 17 sản phẩm SP006 lúc 10 giờ sáng?",
       "status": "PASSED",
       "reason": "Từ chối kết luận khi chưa đủ dữ liệu.",
-      "answer": "Final Answer: Dữ liệu hiện có chỉ cho thấy tồn kho thực tế của SP001 thấp hơn dự kiến 5 cái, nhưng chưa có thông tin nào xác định người chịu trách nhiệm cho thất thoát. Cần kiểm tra lịch sử giao dịch, chứng từ nhập xuất, biên bản kiểm kê hoặc hệ thống quản lý kho để thu thập bằng chứng thêm trước khi đưa ra kết luận.",
+      "answer": "Tôi đã tra cứu chính sách kho để tìm thông tin về ghi nhận camera. Không có bằng chứng nào trong tài liệu cho thấy camera kho ghi nhận ai lấy 17 sản phẩm SP006 lúc 10 giờ sáng. [doc_id=INV-DOC-005, version=1.0, date=2026-07-10]",
+      "steps": 6,
+      "tool_calls": 4,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-010"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-005"
+      ],
+      "doc_id_recall": 0.0,
+      "faithfulness_proxy": 0.5,
+      "token_usage": {
+        "prompt_tokens": 14294,
+        "completion_tokens": 1077,
+        "total_tokens": 15371,
+        "max_prompt": 3352
+      },
+      "estimated_cost_usd": null
+    },
+    {
+      "id": "Q14",
+      "question": "Giá bán hiện tại của Arduino Uno R3 là bao nhiêu?",
+      "status": "PASSED",
+      "reason": "Từ chối kết luận khi chưa đủ dữ liệu.",
+      "answer": "Không tìm thấy trong tài liệu. Dữ liệu giá bán hiện tại của Arduino Uno R3 không có trong hệ thống.",
+      "steps": 3,
+      "tool_calls": 1,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-005"
+      ],
+      "actual_doc_ids": [],
+      "doc_id_recall": 0.0,
+      "faithfulness_proxy": 0.0,
+      "token_usage": {
+        "prompt_tokens": 4955,
+        "completion_tokens": 638,
+        "total_tokens": 5593,
+        "max_prompt": 2066
+      },
+      "estimated_cost_usd": null
+    },
+    {
+      "id": "Q15",
+      "question": "Ngày nào chính xác nhân viên sẽ hoàn tất điều tra phiếu AUD-0002?",
+      "status": "PASSED",
+      "reason": "Từ chối kết luận khi chưa đủ dữ liệu.",
+      "answer": "Không tìm thấy trong tài liệu. Các tài liệu chính sách đã tra cứu (INV‑DOC‑011, INV‑DOC‑009, INV‑DOC‑006, INV‑DOC‑002) không ghi rõ ngày hoàn tất điều tra phiếu AUD‑0002.",
+      "steps": 5,
+      "tool_calls": 4,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-006"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-011",
+        "INV-DOC-009",
+        "INV-DOC-006",
+        "INV-DOC-002"
+      ],
+      "doc_id_recall": 1.0,
+      "faithfulness_proxy": 0.5,
+      "token_usage": {
+        "prompt_tokens": 12736,
+        "completion_tokens": 841,
+        "total_tokens": 13577,
+        "max_prompt": 3352
+      },
+      "estimated_cost_usd": null
+    },
+    {
+      "id": "Q16",
+      "question": "Với SP038 có expected_stock âm, có thể xác định nguyên nhân chính xác chỉ từ CSV không?",
+      "status": "PASSED",
+      "reason": "Đạt kiểm tra nội dung sơ bộ và trích dẫn ít nhất một tài liệu kỳ vọng.",
+      "answer": "Không, chỉ dựa vào dữ liệu CSV (expected_stock âm) không đủ để xác định nguyên nhân chính xác. Theo chính sách điều tra bất thường dữ liệu tồn kho, khi expected_stock âm cần được đánh dấu và tiến hành rà soát, nhưng không tự động suy ra nguyên nhân hay người chịu trách nhiệm.  \n\n[doc_id=INV-DOC-011, version=1.0, date=2026‑10‑14]  \n[doc_id=INV-DOC-009, version=1.0, date=2026‑10‑14]  \n\nDo đó, cần thực hiện quy trình điều tra (xem các giao dịch, kiểm tra dữ liệu nguồn, v.v.) để tìm ra nguyên nhân thực sự.",
+      "steps": 3,
+      "tool_calls": 2,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-009",
+        "INV-DOC-010",
+        "INV-DOC-011"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-011",
+        "INV-DOC-009"
+      ],
+      "doc_id_recall": 0.6666666666666666,
+      "faithfulness_proxy": 0.0,
+      "token_usage": {
+        "prompt_tokens": 5302,
+        "completion_tokens": 605,
+        "total_tokens": 5907,
+        "max_prompt": 2256
+      },
+      "estimated_cost_usd": null
+    },
+    {
+      "id": "Q17",
+      "question": "Hai phiên bản INV-DOC-001 v1.0 và INV-DOC-002 v2.0 mâu thuẫn về mức ưu tiên. Ngưỡng nào hiện hành và căn cứ tài liệu nào?",
+      "status": "PASSED",
+      "reason": "Đạt kiểm tra nội dung sơ bộ và trích dẫn ít nhất một tài liệu kỳ vọng.",
+      "answer": "Mức ưu tiên hiện hành được xác định theo **INV‑DOC‑002 v2.0** (ngày hiệu lực 2026‑10‑01). Theo chính sách này:\n\n- Chênh lệch tuyệt đối ≥ 10 đơn vị → **HIGH**  \n- Chênh lệch tuyệt đối từ 1 đến 9 đơn vị → **NORMAL**  \n- Chênh lệch bằng 0 → không tạo phiếu chênh lệch  \n\nCăn cứ: `[doc_id=INV-DOC-002, version=2.0, date=2026-10-01]`.  \n\nTheo quy tắc “nếu chính sách khác phiên bản mâu thuẫn, ưu tiên phiên bản có ngày hiệu lực mới hơn” (INV‑DOC‑007), nên phiên bản v2.0 được áp dụng thay vì v1.0.",
       "steps": 2,
       "tool_calls": 1,
-      "agent_success": true
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-001",
+        "INV-DOC-002",
+        "INV-DOC-007",
+        "INV-DOC-011"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-002",
+        "INV-DOC-007"
+      ],
+      "doc_id_recall": 0.5,
+      "faithfulness_proxy": 0.4286,
+      "token_usage": {
+        "prompt_tokens": 3530,
+        "completion_tokens": 615,
+        "total_tokens": 4145,
+        "max_prompt": 2082
+      },
+      "estimated_cost_usd": null
     },
     {
-      "id": "eval_011",
-      "question": "Cho biết thời điểm chính xác SP001 bị thất thoát hàng.",
+      "id": "Q18",
+      "question": "SP038 có tồn kho dự kiến âm. Chỉ dựa vào CSV, hãy xác định chính xác giao dịch hoặc người gây ra việc này.",
       "status": "PASSED",
       "reason": "Từ chối kết luận khi chưa đủ dữ liệu.",
-      "answer": "Final Answer: Hiện tại dữ liệu hiện có chưa đủ thông tin để xác định thời điểm chính xác khi SP001 bị thất thoát hàng. Bạn cần kiểm tra lịch sử giao dịch, chứng từ nhập xuất hoặc biên bản kiểm kê liên quan để thu thập bằng chứng chi tiết hơn.",
-      "steps": 1,
-      "tool_calls": 0,
-      "agent_success": true
-    },
-    {
-      "id": "eval_012",
-      "question": "Kiểm tra xem SP004 có bị thất thoát hàng hay không.",
-      "status": "PASSED",
-      "reason": "Từ chối kết luận khi chưa đủ dữ liệu.",
-      "answer": "Final Answer: Không có dữ liệu kiểm đếm thực tế (`physical_count`) cho SP004, vì vậy không thể xác định độ lệch tồn kho và không thể kết luận có thất thoát hàng hay không. Bạn cần thực hiện kiểm kê thực tế để có dữ liệu `physical_count` và sau đó tính toán độ lệch.",
-      "steps": 2,
-      "tool_calls": 1,
-      "agent_success": true
+      "answer": "**Kết quả kiểm tra tồn kho SP038**\n\n- **Tồn kho dự kiến**: -43.0 (âm) – dữ liệu bất thường, cần rà soát theo quy trình (INV‑DOC‑009, INV‑DOC‑011).  \n- **Giao dịch có trạng thái POSTED** (đã được tính vào tồn kho):\n\n| ID giao dịch | Loại | Số lượng | Ngày | Trạng thái |\n|--------------|------|----------|------|------------|\n| TX00220 | OUT | 29 | 2026‑09‑03 | POSTED |\n| TX00217 | OUT | 19 | 2026‑09‑04 | POSTED |\n| TX00218 | OUT | 15 | 2026‑09‑15 | POSTED |\n| TX00222 | OUT | 12 | 2026‑09‑21 | POSTED |\n| TX00216 | OUT | 1  | 2026‑09‑26 | POSTED |\n| TX00223 | OUT | 34 | 2026‑10‑05 | POSTED |\n| TX00219 | OUT | 9  | 2026‑10‑10 | POSTED |\n\n- **Giao dịch không được tính vào tồn kho** (status = CANCELLED hoặc không counted_in_stock): TX00224 (IN 17), TX00221 (IN 6).\n\n**Phân tích**  \nTổng số lượng xuất POSTED = 119, tổng nhập POSTED = 0, nên tồn kho dự kiến = 76 (đầu kỳ) – 119 = –43. Không có giao dịch nào có trạng thái POSTED mà có thể “gây ra” tồn kho âm một cách riêng biệt; toàn bộ số lượng xuất đã vượt quá số lượng có sẵn.  \n\n**Chính sách liên quan**  \n- “Nếu chỉ có số liệu tồn kho mà không có chứng cứ nguyên nhân, không kết luận nguyên nhân chênh lệch.” [doc_id=INV‑DOC‑008, version=1.0, date=2026‑09‑10]  \n- “Mọi kết luận về nguyên nhân phải có bằng chứng tài liệu hoặc hồ sơ giao dịch độc lập; chênh lệch số lượng không đủ để suy ra nguyên nhân.” [doc_id=INV‑DOC‑010, version=1.0, date=2026‑10‑14]  \n- “Chỉ giao dịch status=POSTED mới được tính vào tồn kho.” [doc_id=INV‑DOC‑003, version=1.0, date=2026‑07‑15]\n\n**Kết luận**  \nDựa trên dữ liệu CSV, tồn kho âm của SP038 là kết quả của tổng số lượng xuất POSTED vượt quá số lượng có sẵn. Không có bằng chứng đủ để xác định giao dịch cụ thể hoặc người chịu trách nhiệm gây ra sự chênh lệch. Nếu cần điều tra sâu hơn, cần kiểm tra thêm hồ sơ giao dịch, chứng từ nhập/xuất, và các quy trình kiểm soát nội bộ.",
+      "steps": 4,
+      "tool_calls": 3,
+      "agent_success": true,
+      "expected_doc_ids": [
+        "INV-DOC-009",
+        "INV-DOC-010",
+        "INV-DOC-011"
+      ],
+      "actual_doc_ids": [
+        "INV-DOC-009",
+        "INV-DOC-011",
+        "INV-DOC-008",
+        "INV-DOC-010",
+        "INV-DOC-003"
+      ],
+      "doc_id_recall": 1.0,
+      "faithfulness_proxy": 0.1905,
+      "token_usage": {
+        "prompt_tokens": 8093,
+        "completion_tokens": 1578,
+        "total_tokens": 9671,
+        "max_prompt": 2813
+      },
+      "estimated_cost_usd": null
     }
   ]
 }

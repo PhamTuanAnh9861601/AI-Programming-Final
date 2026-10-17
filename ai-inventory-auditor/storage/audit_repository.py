@@ -17,6 +17,17 @@ class AuditRepository:
         """Lưu phiếu kiểm kê và trả về phiếu vừa tạo."""
         init_database()
 
+        # Idempotency: reuse an open ticket for the same product/variance.
+        with get_connection() as connection:
+            existing = connection.execute(
+                """SELECT * FROM audit_requests
+                   WHERE product_id = ? AND variance = ? AND status = 'OPEN'
+                   ORDER BY created_at DESC LIMIT 1""",
+                (product_id, variance),
+            ).fetchone()
+        if existing is not None:
+            return dict(existing)
+
         audit_id = f"AUD-{uuid4().hex[:8].upper()}"
 
         with get_connection() as connection:

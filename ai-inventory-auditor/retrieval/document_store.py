@@ -77,6 +77,36 @@ def chunk_document(
     return chunks
 
 
+def chunk_document_by_lines(doc: Document) -> list[DocumentChunk]:
+    """Chia theo dòng: mỗi quy tắc đánh số của chính sách là một đoạn nguyên vẹn.
+
+    Lý do: tài liệu chính sách viết mỗi quy tắc trên một dòng (<= ~165 ký tự).
+    Cắt cố định 150 ký tự làm đứt giữa từ/giữa quy tắc (ví dụ "audit_id" bị cắt
+    thành "udit_id"), khiến BM25 mất từ khóa và đoạn đúng bị xếp hạng thấp.
+    """
+    chunks = []
+    for line_number, line in enumerate(doc.content.splitlines(), start=1):
+        text = line.strip()
+        if not text:
+            continue
+        chunks.append(
+            DocumentChunk(
+                content=text,
+                chunk_id=f"{doc.doc_id}_chunk_{len(chunks)}",
+                doc_id=doc.doc_id,
+                chunk_index=len(chunks),
+                metadata={
+                    **doc.metadata,
+                    "title": doc.title,
+                    "source": doc.source,
+                    "chunk_mode": "line",
+                    "line_number": line_number,
+                },
+            )
+        )
+    return chunks
+
+
 # Kho lưu trữ tài liệu
 @dataclass
 class DocumentStore:
@@ -84,6 +114,7 @@ class DocumentStore:
     chunks: dict[str, DocumentChunk] = field(default_factory=dict)
     chunk_size: int = 150
     overlap: int = 30
+    chunk_mode: str = "line"  # "line" (mặc định) hoặc "fixed" (150 ký tự cố định)
 
     # Thêm tài liệu
     def add(self, document: Document) -> str:
@@ -92,11 +123,16 @@ class DocumentStore:
 
         self.documents[document.doc_id] = document
 
-        chunks = chunk_document(
-            document,
-            chunk_size=self.chunk_size,
-            overlap=self.overlap,
-        )
+        if self.chunk_mode == "line":
+            chunks = chunk_document_by_lines(document)
+        elif self.chunk_mode == "fixed":
+            chunks = chunk_document(
+                document,
+                chunk_size=self.chunk_size,
+                overlap=self.overlap,
+            )
+        else:
+            raise ValueError("chunk_mode must be 'line' or 'fixed'")
 
         for chunk in chunks:
             self.add_chunk(chunk)
@@ -167,6 +203,7 @@ class DocumentStore:
         directory: str | Path,
         chunk_size: int = 150,
         overlap: int = 30,
+        chunk_mode: str = "line",
     ) -> "DocumentStore":
 
         """Nạp các tệp chính sách .txt và đọc phần metadata đầu tệp nếu có."""
@@ -174,7 +211,7 @@ class DocumentStore:
         if not path.is_dir():
             raise FileNotFoundError(f"Document directory does not exist: {path}")
 
-        store = cls(chunk_size=chunk_size, overlap=overlap)
+        store = cls(chunk_size=chunk_size, overlap=overlap, chunk_mode=chunk_mode)
 
         for file_path in sorted(path.glob("*.txt")):
             raw_text = file_path.read_text(encoding="utf-8-sig")

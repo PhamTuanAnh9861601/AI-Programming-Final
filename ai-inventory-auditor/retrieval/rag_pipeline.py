@@ -21,6 +21,23 @@ class Evidence:
     metadata: dict
 
 
+def current_doc_ids(store) -> list[str]:
+    """Chọn tài liệu hiện hành: với mỗi tiêu đề, giữ bản có ngày (date) mới nhất.
+
+    Dùng metadata date/version trước khi truy xuất để bản cũ không thắng chỉ vì
+    trùng từ khóa với câu hỏi hơn.
+    """
+    latest_by_title = {}
+    for document in store.documents.values():
+        key = document.title.strip().casefold()
+        previous = latest_by_title.get(key)
+        item_date = str(document.metadata.get("date", ""))
+        prev_date = str(previous.metadata.get("date", "")) if previous else ""
+        if previous is None or item_date > prev_date:
+            latest_by_title[key] = document
+    return [document.doc_id for document in latest_by_title.values()]
+
+
 class RAGPipeline:
     """Nạp tệp chính sách một lần, sau đó truy xuất bằng chứng theo từng câu hỏi."""
     def __init__(self, store: VectorStore):

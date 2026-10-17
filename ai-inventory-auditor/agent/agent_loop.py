@@ -1,9 +1,11 @@
 
-from email.mime import message
 import json
+import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, get_type_hints
+import inspect
 
 from groq import Groq
 
@@ -19,6 +21,10 @@ from agent.schemas import AgentResult
 
 
 ToolFunction = Callable[..., Any]
+
+
+RATE_LIMIT_RETRIES = 5   # số lần thử lại khi Groq trả 429 (vượt TPM/RPM)
+MAX_SEARCH_CALLS = 3     # trần số lần tra cứu chính sách trong một lượt chạy
 
 
 class AgentLoop:
@@ -50,91 +56,9 @@ class AgentLoop:
 
         self.system_prompt = prompt_path.read_text(encoding="utf-8")
 
-        # Schema native tool calling gửi cho Groq.
-        self.tool_schemas = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_stock_data",
-                    "description": (
-                        "Lấy dữ liệu tồn kho, tồn dự kiến và độ lệch "
-                        "của một sản phẩm."
-                    ),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "product_id": {
-                                "type": "string",
-                                "description": "Mã sản phẩm, ví dụ SP001.",
-                            }
-                        },
-                        "required": ["product_id"],
-                        "additionalProperties": False,
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_all_stock_data",
-                    "description": "Lấy dữ liệu tồn kho của tất cả sản phẩm.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                        "additionalProperties": False,
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "create_audit_request",
-                    "description": (
-                        "Tạo phiếu kiểm toán cho sản phẩm khi đủ điều kiện."
-                    ),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "product_id": {
-                                "type": "string",
-                                "description": "Mã sản phẩm cần kiểm toán.",
-                            },
-                            "reason": {
-                                "type": "string",
-                                "description": "Lý do yêu cầu kiểm toán.",
-                            },
-                        },
-                        "required": ["product_id", "reason"],
-                        "additionalProperties": False,
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_audit_request",
-                    "description": (
-                        "Đọc lại phiếu kiểm toán theo audit_id "
-                        "để xác minh dữ liệu đã lưu."
-                    ),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "audit_id": {
-                                "type": "string",
-                                "description": "Mã phiếu kiểm toán.",
-                            }
-                        },
-                        "required": ["audit_id"],
-                        "additionalProperties": False,
-                    },
-                },
-            },
-        ]
-
-        # Nếu MCP cung cấp schema, sử dụng schema đã khám phá từ server.
-        if tool_schemas is not None:
-            self.tool_schemas = tool_schemas
+        # Ưu tiên schema được MCP client discover. Khi dùng unit test/local tools,
+        # tự sinh schema từ type hints/signature thay vì hard-code tên tool.
+        self.tool_schemas = tool_schemas if tool_schemas is not None else self._schemas_from_registry(tools)
 
         # Chỉ công bố schema cho tool thực sự có trong registry.
         self.tool_schemas = [
@@ -144,6 +68,99 @@ class AgentLoop:
         ]
 
     
+    @staticmethod
+    def _schemas_from_registry(tools: dict[str, ToolFunction]) -> list[dict[str, Any]]:
+        """Sinh schema JSON từ signature Python; production dùng schema MCP discover."""
+        def json_type(annotation):
+            if annotation in (str,):
+                return "string"
+            if annotation in (int,):
+                return "integer"
+            if annotation in (float,):
+                return "number"
+            if annotation in (bool,):
+                return "boolean"
+            origin = getattr(annotation, "__origin__", None)
+            if origin in (list, tuple):
+                return "array"
+            if origin is dict:
+                return "object"
+            return "string"
+
+        schemas = []
+        for name, function in tools.items():
+            signature = inspect.signature(function)
+            try:
+                hints = get_type_hints(function)
+            except Exception:
+                hints = {}
+            properties = {}
+            required = []
+            for param_name, param in signature.parameters.items():
+                if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+                    continue
+                annotation = hints.get(param_name, param.annotation)
+                properties[param_name] = {"type": json_type(annotation)}
+                if param.default is inspect.Parameter.empty:
+                    required.append(param_name)
+            schemas.append({
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": inspect.getdoc(function) or name,
+                    "parameters": {
+                        "type": "object", "properties": properties,
+                        "required": required, "additionalProperties": False,
+                    },
+                },
+            })
+        return schemas
+
+    @staticmethod
+    def _is_rate_limit(exc: Exception) -> bool:
+        text = str(exc).lower()
+        return (
+            getattr(exc, "status_code", None) == 429
+            or "rate_limit" in text
+            or "error code: 429" in text
+        )
+
+    @staticmethod
+    def _is_daily_limit(exc: Exception) -> bool:
+        """Hết hạn mức theo NGÀY (TPD/RPD): chờ vài giây không giúp ích, không thử lại."""
+        text = str(exc).lower()
+        return any(key in text for key in ("tokens per day", "(tpd)", "requests per day", "(rpd)"))
+
+    @staticmethod
+    def _retry_delay(exc: Exception, attempt: int) -> float:
+        """Đọc 'try again in 2.5s/15ms' từ thông báo lỗi; mặc định lùi theo cấp số nhân."""
+        match = re.search(r"try again in ([0-9.]+)\s*(ms|s)", str(exc))
+        if match:
+            wait = float(match.group(1)) / (1000 if match.group(2) == "ms" else 1)
+        else:
+            wait = 2 ** attempt
+        return min(wait + 1.0, 30.0)
+
+    def _create_completion(self, messages: list, tools: list):
+        """Gọi Groq, tự thử lại có chờ khi bị giới hạn tốc độ (429)."""
+        for attempt in range(1, RATE_LIMIT_RETRIES + 1):
+            try:
+                return self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice="auto",
+                    temperature=0,
+                )
+            except Exception as exc:
+                if (
+                    not self._is_rate_limit(exc)
+                    or self._is_daily_limit(exc)
+                    or attempt == RATE_LIMIT_RETRIES
+                ):
+                    raise
+                time.sleep(self._retry_delay(exc, attempt))
+
     def _allows_audit_creation(self, question: str) -> bool:
         """Chỉ cho phép ghi database khi người dùng yêu cầu tạo phiếu rõ ràng."""
         text = question.lower().strip()
@@ -287,6 +304,7 @@ class AgentLoop:
         run_log["answer"] = result.answer
         run_log["success"] = result.success
         run_log["tool_calls_count"] = result.tool_calls
+        result.token_usage = dict(run_log.get("token_usage", {}))
 
         self._write_run_log(run_log)
         return result
@@ -325,7 +343,9 @@ class AgentLoop:
                 "prompt_tokens": 0,
                 "completion_tokens": 0,
                 "total_tokens": 0,
+                "max_prompt": 0,
             },
+            "per_step_usage": [],
             "answer": "",
             "success": False,
         }
@@ -335,16 +355,17 @@ class AgentLoop:
         # Theo dõi trạng thái xác minh phiếu kiểm toán.
         pending_audit_id = None
         verified_audit_id = None
+        empty_retries = 0
+        no_tool_nudged = False
+        search_calls = 0
+        evidence_found = False      # có lần tra cứu nào trả về bằng chứng chưa
+        data_quality_seen = False   # có tool nào cảnh báo dữ liệu bất thường (tồn âm) chưa
+        grounding_nudged = False
+        anomaly_nudged = False
 
         for step in range(1, self.max_steps + 1):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    tools=allowed_tools,
-                    tool_choice="auto",
-                    temperature=0,
-                )
+                response = self._create_completion(messages, allowed_tools)
 
             except Exception as exc:
                 return self._finish_run(
@@ -372,6 +393,16 @@ class AgentLoop:
                 run_log["token_usage"]["total_tokens"] += (
                     getattr(usage, "total_tokens", 0) or 0
                 )
+                prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+                run_log["token_usage"]["max_prompt"] = max(
+                    run_log["token_usage"]["max_prompt"], prompt_tokens
+                )
+                run_log["per_step_usage"].append({
+                    "step": step,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
+                    "total_tokens": getattr(usage, "total_tokens", 0) or 0,
+                })
 
 
             message = response.choices[0].message
@@ -413,7 +444,19 @@ class AgentLoop:
                         if not isinstance(arguments, dict):
                             success = False
                             output = "Error: Tham số tool phải là JSON object."
+                        elif (
+                            tool_name == "search_inventory_policy"
+                            and search_calls >= MAX_SEARCH_CALLS
+                        ):
+                            success = False
+                            output = (
+                                f"Error: Đã tra cứu chính sách tối đa {MAX_SEARCH_CALLS} lần. "
+                                "Hãy trả lời dựa trên bằng chứng đã có, hoặc nói rõ "
+                                "'Không tìm thấy trong tài liệu'."
+                            )
                         else:
+                            if tool_name == "search_inventory_policy":
+                                search_calls += 1
                             success, output = self._execute_tool(
                                 tool_name,
                                 arguments,
@@ -431,6 +474,20 @@ class AgentLoop:
                         "output": output,
                         "tool_call_id": call.id,
                     })
+
+                    # Ghi nhận bằng chứng và cảnh báo dữ liệu để kiểm tra câu trả lời cuối.
+                    try:
+                        seen_payload = json.loads(output) if success and isinstance(output, str) else None
+                    except json.JSONDecodeError:
+                        seen_payload = None
+                    if isinstance(seen_payload, dict):
+                        if (
+                            tool_name == "search_inventory_policy"
+                            and (seen_payload.get("evidence_count") or 0) > 0
+                        ):
+                            evidence_found = True
+                        if seen_payload.get("data_quality_flag") or seen_payload.get("data_quality_note"):
+                            data_quality_seen = True
 
                     # Theo dõi việc tạo phiếu kiểm toán.
                     if success and tool_name == "create_audit_request":
@@ -500,6 +557,67 @@ class AgentLoop:
                 })
                 continue
 
+
+            if tool_calls_count == 0 and allowed_tools and not no_tool_nudged:
+                no_tool_nudged = True
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Bạn chưa dùng công cụ nào. Hãy gọi search_inventory_policy với một truy vấn "
+                        "tiếng Việt mô tả quy tắc cần tra để lấy bằng chứng trước khi trả lời. "
+                        "Không gọi công cụ khác với mã bạn tự đặt."
+                    ),
+                })
+                continue
+
+            answer_lower = content.strip().lower()
+            if (
+                answer_lower
+                and data_quality_seen
+                and not anomaly_nudged
+                and not any(w in answer_lower for w in ("rà soát", "bất thường", "điều tra"))
+            ):
+                anomaly_nudged = True
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Dữ liệu sản phẩm này có tồn dự kiến âm. Theo INV-DOC-011, đây là bất thường "
+                        "dữ liệu cần được đánh dấu để rà soát trước khi diễn giải. Hãy trả lời lại: "
+                        "nêu dữ kiện, nói rõ cần rà soát, không suy ra nguyên nhân và không chỉ định "
+                        "giao dịch hay người gây ra."
+                    ),
+                })
+                continue
+
+            if (
+                answer_lower
+                and evidence_found
+                and not grounding_nudged
+                and "doc_id=" not in answer_lower
+                and "không tìm thấy" not in answer_lower
+            ):
+                grounding_nudged = True
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Bạn đã tra cứu tài liệu. Hãy trả lời lại dựa trên các đoạn bằng chứng: trích dẫn "
+                        "[doc_id=..., version=..., date=...] cho nội dung lấy từ tài liệu; nếu không đoạn nào "
+                        "trả lời câu hỏi, nói rõ 'Không tìm thấy trong tài liệu'. Không nêu giá trị không có "
+                        "trong bằng chứng hoặc kết quả công cụ."
+                    ),
+                })
+                continue
+
+            if not content.strip() and empty_retries < 1:
+                empty_retries += 1
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Hãy đưa ra câu trả lời cuối cùng cho người dùng "
+                        "dựa trên kết quả các tool đã gọi."
+                    ),
+                })
+                continue
 
             if content.strip() and finish_reason == "stop":
                 return self._finish_run(
