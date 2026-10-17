@@ -1,7 +1,45 @@
-# AI usage disclosure
+# AI Inventory Auditor
 
-This project uses an LLM (Groq API) at runtime for intent interpretation, tool selection, and natural-language responses. The application code calls the model through `agent/agent_loop.py`; the model does not directly access the CSV files or database. Inventory calculations and audit persistence are performed by deterministic Python services and SQLite.
+Agent kiểm toán tồn kho dùng Groq native tool calling, MCP stdio, dịch vụ nghiệp vụ có kiểm soát, và RAG tra cứu tài liệu chính sách.
 
-AI-assisted development was used for code drafting, debugging, and documentation. The team reviewed and adapted generated code, ran local unit tests and the evaluation script, and remains responsible for correctness, security, citations, and final submission. Update this file with the actual tools, prompts, and contributions used by each team member before submission; do not claim tests or manual review that were not performed.
+## Yêu cầu
+- Python 3.11+ (khuyến nghị)
+- Groq API key có quyền dùng model được cấu hình
+- Cài dependencies từ `requirements.txt`
 
-The evaluation metric `faithfulness_proxy` is a simple citation-presence heuristic, not a human-validated semantic faithfulness score.
+## Cài đặt
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+```
+Mở `.env`, điền `GROQ_API_KEY`. Không commit `.env` hoặc API key.
+
+## Chạy demo
+```powershell
+python app.py
+```
+MCP client chạy server qua stdio, tự discover tools/schema, rồi đưa schema đó cho AgentLoop. Ví dụ câu hỏi đọc-only: `Kiểm tra tồn kho SP001`. Muốn ghi phiếu phải yêu cầu rõ ràng, ví dụ `Tạo phiếu kiểm toán cho SP001 vì có chênh lệch tồn kho`.
+
+## Test và evaluation
+```powershell
+python -m unittest tests.test_inventory_service tests.test_audit_service tests.test_agent_loop -v
+python evaluation/evaluate.py
+```
+Evaluation dùng `data/tests/testset.jsonl`, đi qua MCP và lưu báo cáo tại `evaluation/results.json`. Bộ test chứa ca tính toán, chính sách nhiều phiên bản, dữ liệu thiếu, suy luận cần nhiều tài liệu và câu cần từ chối. Một số ca có thể thất bại; không sửa kết quả chỉ để đạt 100%.
+
+## Makefile
+Trên môi trường có GNU Make: `make setup`, `make demo`, `make eval`, `make test`. Trên Windows PowerShell, các lệnh Python phía trên tương đương và không yêu cầu cài Make.
+
+## Thiết kế
+- `agent/agent_loop.py`: vòng lặp tool calling, quyền ghi, giới hạn bước, retry/timeout do client API cấu hình, log usage.
+- `tools/mcp_client.py`, `mcp_server/server.py`: MCP stdio và schema discovery.
+- `tools/inventory_tools.py`: adapter nghiệp vụ và search policy RAG.
+- `business/`, `storage/`: tính tồn kho, kiểm soát phiếu, SQLite và verify sau ghi.
+- `retrieval/`, `data/documents/`: chunking ký tự với overlap 30 ký tự để giảm mất ngữ cảnh ở ranh giới; dense cosine và hybrid BM25 + vector.
+- `evaluation/`: pass/fail theo tiêu chí, recall doc_id và faithfulness proxy. Proxy chỉ là chỉ số tự động sơ bộ, không thay thế đánh giá ngữ nghĩa của người chấm.
+
+## Log và bảo mật
+Mỗi lượt chạy ghi `logs/agent_runs.jsonl`, `logs/agent_runs_pretty.json` và một JSONL riêng trong `logs/per_run/`. Log gồm prompt/completion/total tokens, `max_prompt`, tool arguments/results và câu trả lời. Kiểm tra log trước khi nộp, loại bỏ thông tin nhạy cảm nếu có. Không đưa `.env`, database runtime hoặc dữ liệu cá nhân vào Git.
