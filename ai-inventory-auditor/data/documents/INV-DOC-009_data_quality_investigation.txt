@@ -1,0 +1,11 @@
+DOC_ID: INV-DOC-009
+TITLE: Quy trình điều tra bất thường dữ liệu tồn kho
+VERSION: 1.0
+DATE: 2026-10-14
+OWNER: Data Quality Team
+
+1. Nếu tồn kho dự kiến âm, không tự động điều chỉnh opening_stock hoặc quantity.
+2. Kiểm tra giao dịch POSTED, ngày giao dịch, loại IN/OUT, sản phẩm liên quan và phạm vi kỳ.
+3. Phân biệt lỗi dữ liệu với nguyên nhân vận hành; không kết luận thất thoát nếu chưa có chứng cứ độc lập.
+4. Ghi bất thường vào báo cáo chất lượng dữ liệu với mã sản phẩm, phép tính và các trường nguồn liên quan.
+5. Chỉ sửa dữ liệu nguồn sau khi có phê duyệt và lưu lại giá trị trước/sau cùng lý do.

@@ -7,7 +7,7 @@ OWNER: Inventory Department
 1. Tồn kho dự kiến = tồn đầu kỳ + tổng nhập đã POSTED - tổng xuất đã POSTED trong kỳ.
 2. Nếu tồn thực tế khác tồn dự kiến, tạo phiếu kiểm kê để xác minh.
 3. Chênh lệch tuyệt đối >= 10 đơn vị: mức ưu tiên HIGH.
-4. Chênh lệch tuyệt đối từ 1 đến 9 đơn vị: mức ưu tiên NORMAL.
+4. Với số lượng có thể là số thập phân, chênh lệch tuyệt đối lớn hơn 0 và nhỏ hơn 10 đơn vị: mức ưu tiên NORMAL (bao gồm 9.5). Nếu chỉ dùng số nguyên thì tương đương từ 1 đến 9.
 5. Chênh lệch bằng 0 thì không tạo phiếu kiểm kê chênh lệch.
 6. Phiếu phải ghi product_id, expected_stock, physical_count, variance, priority và policy_doc_id.
 7. Không kết luận nguyên nhân thất thoát chỉ từ số liệu tồn kho.

@@ -53,7 +53,7 @@ class Transaction:
     transaction_type: TransactionType
     quantity: int
     status: TransactionStatus
-    transaction_date: Optional[datetime] = None  
+    transaction_date: Optional[datetime] = None
 
 @dataclass
 class StockSummary:
@@ -65,7 +65,7 @@ class StockSummary:
     expected_stock: int
     physical_count: Optional[int] = None
     variance: Optional[int] = None
-    unit: str = "cái"            
+    unit: str = "cái"
     severity: str = "NORMAL"
 
 
@@ -83,5 +83,3 @@ class AuditTicket:
     audit_id: str = ""
     status: AuditStatus = AuditStatus.OPEN
     created_at: datetime = field(default_factory=datetime.now)
-
-

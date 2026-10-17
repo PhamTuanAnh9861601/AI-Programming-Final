@@ -37,12 +37,12 @@ def chunk_document(
     chunk_size: int = 150,
     overlap: int = 30
 ) -> list[DocumentChunk]:
-    
+
 
     """Chia văn bản tài liệu thành các đoạn có độ dài cố định và phần chồng lặp."""
     if chunk_size < 1:
         raise ValueError("chunk_size must be at least 1")
-    
+
     if overlap < 0 or overlap >= chunk_size:
         raise ValueError("overlap must be between 0 and chunk_size - 1")
 
@@ -159,7 +159,7 @@ class DocumentStore:
             "chunks": len(self.chunks),
         }
 
-    
+
 # Hàm nạp tệp
     @classmethod
     def from_directory(
@@ -168,7 +168,7 @@ class DocumentStore:
         chunk_size: int = 150,
         overlap: int = 30,
     ) -> "DocumentStore":
-        
+
         """Nạp các tệp chính sách .txt và đọc phần metadata đầu tệp nếu có."""
         path = Path(directory)
         if not path.is_dir():

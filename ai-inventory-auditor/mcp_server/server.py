@@ -22,9 +22,20 @@ def get_all_stock_data() -> list[dict]:
 
 
 @mcp.tool()
-def search_inventory_policy(query: str, top_k: int = 3) -> dict:
-    """Tìm các đoạn chính sách kho liên quan và trả về bằng chứng kèm nguồn."""
-    return inventory_tools.search_inventory_policy(query, top_k=top_k)
+def get_transactions(product_id: str) -> dict:
+    """Liệt kê giao dịch của một sản phẩm kèm trạng thái (POSTED/DRAFT) và việc có được tính vào tồn kho."""
+    return inventory_tools.get_transactions(product_id)
+
+
+@mcp.tool()
+def search_inventory_policy(
+    query: str, top_k: int = 3, search_mode: str = "hybrid",
+    min_score: float = 0.25,
+) -> dict:
+    """Tìm bằng chứng theo dense/hybrid; chỉ trả đoạn đạt min_score (0..1)."""
+    return inventory_tools.search_inventory_policy(
+        query, top_k=top_k, search_mode=search_mode, min_score=min_score
+    )
 
 
 @mcp.tool()

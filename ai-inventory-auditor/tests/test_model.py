@@ -53,7 +53,7 @@ class Transaction:
     transaction_type: TransactionType
     quantity: int
     status: TransactionStatus
-    transaction_date: Optional[datetime] = None  
+    transaction_date: Optional[datetime] = None
 
 @dataclass
 class StockSummary:
@@ -65,7 +65,7 @@ class StockSummary:
     expected_stock: int
     physical_count: Optional[int] = None
     variance: Optional[int] = None
-    unit: str = "cái"            
+    unit: str = "cái"
     severity: str = "NORMAL"
 
 
@@ -91,8 +91,8 @@ class AuditTicket:
 if __name__ == "__main__":
     print("--- 1. Test Product ---")
     product = Product(
-        product_id="SPD001", 
-        product_name="Cảm biến siêu âm HC-SR04", 
+        product_id="SPD001",
+        product_name="Cảm biến siêu âm HC-SR04",
         opening_stock=80
     )
     print(product)

@@ -6,6 +6,6 @@ OWNER: Inventory Department
 
 Theo chính sách hiện hành INV-DOC-002 version 2.0:
 - abs(variance) >= 10: HIGH.
-- 1 <= abs(variance) <= 9: NORMAL.
+- 0 < abs(variance) < 10: NORMAL (bao gồm 9.5 nếu số lượng thập phân được phép; số nguyên tương đương 1..9).
 - variance = 0: không tạo phiếu chênh lệch.
 Nếu chính sách khác phiên bản mâu thuẫn, ưu tiên phiên bản có ngày hiệu lực mới hơn.

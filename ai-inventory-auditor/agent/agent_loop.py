@@ -1,8 +1,11 @@
 
-from email.mime import message
 import json
+import re
+import time
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, get_type_hints
+import inspect
 
 from groq import Groq
 
@@ -20,6 +23,10 @@ from agent.schemas import AgentResult
 ToolFunction = Callable[..., Any]
 
 
+RATE_LIMIT_RETRIES = 5   # số lần thử lại khi Groq trả 429 (vượt TPM/RPM)
+MAX_SEARCH_CALLS = 3     # trần số lần tra cứu chính sách trong một lượt chạy
+
+
 class AgentLoop:
     """Điều phối ReAct Agent sử dụng native tool calling của Groq."""
 
@@ -27,6 +34,7 @@ class AgentLoop:
         self,
         tools: dict[str, ToolFunction],
         client: Groq | None = None,
+        tool_schemas: list[dict[str, Any]] | None = None,
     ):
         if client is None and not GROQ_API_KEY:
             raise ValueError("Thiếu GROQ_API_KEY. Hãy kiểm tra file .env.")
@@ -48,87 +56,9 @@ class AgentLoop:
 
         self.system_prompt = prompt_path.read_text(encoding="utf-8")
 
-        # Schema native tool calling gửi cho Groq.
-        self.tool_schemas = [
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_stock_data",
-                    "description": (
-                        "Lấy dữ liệu tồn kho, tồn dự kiến và độ lệch "
-                        "của một sản phẩm."
-                    ),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "product_id": {
-                                "type": "string",
-                                "description": "Mã sản phẩm, ví dụ SP001.",
-                            }
-                        },
-                        "required": ["product_id"],
-                        "additionalProperties": False,
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_all_stock_data",
-                    "description": "Lấy dữ liệu tồn kho của tất cả sản phẩm.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                        "additionalProperties": False,
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "create_audit_request",
-                    "description": (
-                        "Tạo phiếu kiểm toán cho sản phẩm khi đủ điều kiện."
-                    ),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "product_id": {
-                                "type": "string",
-                                "description": "Mã sản phẩm cần kiểm toán.",
-                            },
-                            "reason": {
-                                "type": "string",
-                                "description": "Lý do yêu cầu kiểm toán.",
-                            },
-                        },
-                        "required": ["product_id", "reason"],
-                        "additionalProperties": False,
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_audit_request",
-                    "description": (
-                        "Đọc lại phiếu kiểm toán theo audit_id "
-                        "để xác minh dữ liệu đã lưu."
-                    ),
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "audit_id": {
-                                "type": "string",
-                                "description": "Mã phiếu kiểm toán.",
-                            }
-                        },
-                        "required": ["audit_id"],
-                        "additionalProperties": False,
-                    },
-                },
-            },
-        ]
+        # Ưu tiên schema được MCP client discover. Khi dùng unit test/local tools,
+        # tự sinh schema từ type hints/signature thay vì hard-code tên tool.
+        self.tool_schemas = tool_schemas if tool_schemas is not None else self._schemas_from_registry(tools)
 
         # Chỉ công bố schema cho tool thực sự có trong registry.
         self.tool_schemas = [
@@ -138,6 +68,89 @@ class AgentLoop:
         ]
 
     
+    @staticmethod
+    def _schemas_from_registry(tools: dict[str, ToolFunction]) -> list[dict[str, Any]]:
+        """Sinh schema JSON từ signature Python; production dùng schema MCP discover."""
+        def json_type(annotation):
+            if annotation in (str,):
+                return "string"
+            if annotation in (int,):
+                return "integer"
+            if annotation in (float,):
+                return "number"
+            if annotation in (bool,):
+                return "boolean"
+            origin = getattr(annotation, "__origin__", None)
+            if origin in (list, tuple):
+                return "array"
+            if origin is dict:
+                return "object"
+            return "string"
+
+        schemas = []
+        for name, function in tools.items():
+            signature = inspect.signature(function)
+            try:
+                hints = get_type_hints(function)
+            except Exception:
+                hints = {}
+            properties = {}
+            required = []
+            for param_name, param in signature.parameters.items():
+                if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+                    continue
+                annotation = hints.get(param_name, param.annotation)
+                properties[param_name] = {"type": json_type(annotation)}
+                if param.default is inspect.Parameter.empty:
+                    required.append(param_name)
+            schemas.append({
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": inspect.getdoc(function) or name,
+                    "parameters": {
+                        "type": "object", "properties": properties,
+                        "required": required, "additionalProperties": False,
+                    },
+                },
+            })
+        return schemas
+
+    @staticmethod
+    def _is_rate_limit(exc: Exception) -> bool:
+        text = str(exc).lower()
+        return (
+            getattr(exc, "status_code", None) == 429
+            or "rate_limit" in text
+            or "error code: 429" in text
+        )
+
+    @staticmethod
+    def _retry_delay(exc: Exception, attempt: int) -> float:
+        """Đọc 'try again in 2.5s/15ms' từ thông báo lỗi; mặc định lùi theo cấp số nhân."""
+        match = re.search(r"try again in ([0-9.]+)\s*(ms|s)", str(exc))
+        if match:
+            wait = float(match.group(1)) / (1000 if match.group(2) == "ms" else 1)
+        else:
+            wait = 2 ** attempt
+        return min(wait + 1.0, 30.0)
+
+    def _create_completion(self, messages: list, tools: list):
+        """Gọi Groq, tự thử lại có chờ khi bị giới hạn tốc độ (429)."""
+        for attempt in range(1, RATE_LIMIT_RETRIES + 1):
+            try:
+                return self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    tools=tools,
+                    tool_choice="auto",
+                    temperature=0,
+                )
+            except Exception as exc:
+                if not self._is_rate_limit(exc) or attempt == RATE_LIMIT_RETRIES:
+                    raise
+                time.sleep(self._retry_delay(exc, attempt))
+
     def _allows_audit_creation(self, question: str) -> bool:
         """Chỉ cho phép ghi database khi người dùng yêu cầu tạo phiếu rõ ràng."""
         text = question.lower().strip()
@@ -166,7 +179,7 @@ class AgentLoop:
         ]
         return any(phrase in text for phrase in write_phrases)
 
-
+    
     
     def _execute_tool(
         self,
@@ -208,6 +221,87 @@ class AgentLoop:
             return False, f"Error: {type(exc).__name__}: {exc}"
 
 
+    def _write_run_log(self, record: dict[str, Any]) -> None:
+        """Lưu log tổng hợp và một file JSONL riêng cho mỗi lần chạy."""
+        log_dir = Path(__file__).resolve().parents[1] / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        # Chuyển bản ghi thành JSON trên một dòng.
+        json_line = json.dumps(
+            record,
+            ensure_ascii=False,
+            default=str,
+        )
+
+        # 1. Ghi vào file JSONL tổng hợp (giữ nguyên chức năng cũ).
+        jsonl_path = log_dir / "agent_runs.jsonl"
+        with jsonl_path.open("a", encoding="utf-8") as file:
+            file.write(json_line + "\n")
+
+        # 2. Tạo file JSONL riêng cho mỗi lần chạy.
+        per_run_dir = log_dir / "per_run"
+        per_run_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = record.get("timestamp", "")
+        safe_timestamp = (
+            timestamp.replace(":", "-").replace(".", "-")
+            if timestamp
+            else "unknown-time"
+        )
+
+        # UUID giúp tránh trùng tên file khi chạy gần như đồng thời.
+        from uuid import uuid4
+
+        run_filename = f"run_{safe_timestamp}_{uuid4().hex[:8]}.jsonl"
+        run_path = per_run_dir / run_filename
+
+        with run_path.open("w", encoding="utf-8", newline="\n") as file:
+            file.write(json_line + "\n")
+
+        # 3. Ghi file JSON dễ đọc (giữ nguyên chức năng cũ).
+        pretty_path = log_dir / "agent_runs_pretty.json"
+        records = []
+
+        if pretty_path.exists():
+            try:
+                records = json.loads(pretty_path.read_text(encoding="utf-8"))
+                if not isinstance(records, list):
+                    records = []
+            except json.JSONDecodeError:
+                records = []
+
+        records.append(record)
+
+        pretty_path.write_text(
+            json.dumps(
+                records,
+                ensure_ascii=False,
+                indent=4,
+                default=str,
+            ),
+            encoding="utf-8",
+        )
+
+
+    
+    def _finish_run(
+        self,
+        result: AgentResult,
+        run_log: dict[str, Any],
+    ) -> AgentResult:
+        """Lưu log cuối cùng rồi trả kết quả Agent."""
+        run_log["steps"] = result.steps
+        run_log["answer"] = result.answer
+        run_log["success"] = result.success
+        run_log["tool_calls_count"] = result.tool_calls
+        result.token_usage = dict(run_log.get("token_usage", {}))
+
+        self._write_run_log(run_log)
+        return result
+
+
+
+
     def run(self, question: str) -> AgentResult:
         """Chạy vòng lặp ReAct cho một câu hỏi."""
         allow_write = self._allows_audit_creation(question)
@@ -226,27 +320,104 @@ class AgentLoop:
 
         tool_calls_count = 0
 
+        
+        
+        run_log = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "question": question,
+            "model": self.model,
+            "steps": 0,
+            "tool_calls": [],
+            "tool_calls_count": 0,
+            "token_usage": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "max_prompt": 0,
+            },
+            "per_step_usage": [],
+            "answer": "",
+            "success": False,
+        }
+
+
+
         # Theo dõi trạng thái xác minh phiếu kiểm toán.
         pending_audit_id = None
         verified_audit_id = None
+        empty_retries = 0
+        no_tool_nudged = False
+        search_calls = 0
+        invalid_tool_retries = 0
 
         for step in range(1, self.max_steps + 1):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    tools=allowed_tools,
-                    tool_choice="auto",
-                    temperature=0,
-                )
+                response = self._create_completion(messages, allowed_tools)
+
             except Exception as exc:
-                return AgentResult(
-                    question=question,
-                    answer=f"Lỗi khi gọi Groq API: {exc}",
-                    steps=step,
-                    success=False,
-                    tool_calls=tool_calls_count,
+                error_text = str(exc).lower()
+                if (
+                    invalid_tool_retries < 1
+                    and "tool_use_failed" in error_text
+                    and "not in request.tools" in error_text
+                ):
+                    # Some model responses can name a tool that was deliberately
+                    # omitted (for example, a write tool on a read-only request).
+                    # Groq rejects that response before we can apply our local
+                    # permission guard, so ask the model to continue using only
+                    # the tools actually offered in this request.
+                    invalid_tool_retries += 1
+                    run_log.setdefault("api_retries", []).append({
+                        "step": step,
+                        "reason": "model_requested_tool_not_offered",
+                    })
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "Lượt gọi trước không hợp lệ vì đã yêu cầu một tool "
+                            "không được cung cấp. Chỉ dùng các tool hiện có trong "
+                            "request và tuân thủ quyền đọc/ghi của yêu cầu ban đầu. "
+                            "Dựa trên kết quả tool đã có để trả lời; không yêu cầu "
+                            "tạo phiếu nếu người dùng không yêu cầu rõ ràng."
+                        ),
+                    })
+                    continue
+                return self._finish_run(
+                    AgentResult(
+                        question=question,
+                        answer=f"Lỗi khi gọi Groq API: {exc}",
+                        steps=step,
+                        success=False,
+                        tool_calls=tool_calls_count,
+                    ),
+                    run_log,
                 )
+
+            # Ghi log vào file JSONL để debug và phân tích sau này.
+            run_log["steps"] = step
+
+            usage = getattr(response, "usage", None)
+            if usage is not None:
+                run_log["token_usage"]["prompt_tokens"] += (
+                    getattr(usage, "prompt_tokens", 0) or 0
+                )
+                run_log["token_usage"]["completion_tokens"] += (
+                    getattr(usage, "completion_tokens", 0) or 0
+                )
+                run_log["token_usage"]["total_tokens"] += (
+                    getattr(usage, "total_tokens", 0) or 0
+                )
+                prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+                run_log["token_usage"]["max_prompt"] = max(
+                    run_log["token_usage"]["max_prompt"], prompt_tokens
+                )
+                run_log["per_step_usage"].append({
+                    "step": step,
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": getattr(usage, "completion_tokens", 0) or 0,
+                    "total_tokens": getattr(usage, "total_tokens", 0) or 0,
+                })
+
 
             message = response.choices[0].message
             finish_reason = response.choices[0].finish_reason
@@ -276,6 +447,7 @@ class AgentLoop:
 
                 for call in message.tool_calls:
                     tool_name = call.function.name
+                    arguments: dict[str, Any] = {}
 
                     try:
                         arguments = json.loads(call.function.arguments or "{}")
@@ -286,13 +458,36 @@ class AgentLoop:
                         if not isinstance(arguments, dict):
                             success = False
                             output = "Error: Tham số tool phải là JSON object."
+                        elif (
+                            tool_name == "search_inventory_policy"
+                            and search_calls >= MAX_SEARCH_CALLS
+                        ):
+                            success = False
+                            output = (
+                                f"Error: Đã tra cứu chính sách tối đa {MAX_SEARCH_CALLS} lần. "
+                                "Hãy trả lời dựa trên bằng chứng đã có, hoặc nói rõ "
+                                "'Không tìm thấy trong tài liệu'."
+                            )
                         else:
+                            if tool_name == "search_inventory_policy":
+                                search_calls += 1
                             success, output = self._execute_tool(
                                 tool_name,
                                 arguments,
                                 allow_write=allow_write,
                             )
                     tool_calls_count += 1
+
+                    run_log["tool_calls"].append({
+                        "step": step,
+                        "tool_name": tool_name,
+                        "arguments": (
+                            arguments if isinstance(arguments, dict) else {}
+                        ),
+                        "success": success,
+                        "output": output,
+                        "tool_call_id": call.id,
+                    })
 
                     # Theo dõi việc tạo phiếu kiểm toán.
                     if success and tool_name == "create_audit_request":
@@ -363,33 +558,65 @@ class AgentLoop:
                 continue
 
 
+            if tool_calls_count == 0 and allowed_tools and not no_tool_nudged:
+                no_tool_nudged = True
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Bạn chưa dùng công cụ nào. Hãy gọi search_inventory_policy với một truy vấn "
+                        "tiếng Việt mô tả quy tắc cần tra để lấy bằng chứng trước khi trả lời. "
+                        "Không gọi công cụ khác với mã bạn tự đặt."
+                    ),
+                })
+                continue
+
+            if not content.strip() and empty_retries < 1:
+                empty_retries += 1
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "Hãy đưa ra câu trả lời cuối cùng cho người dùng "
+                        "dựa trên kết quả các tool đã gọi."
+                    ),
+                })
+                continue
+
             if content.strip() and finish_reason == "stop":
-                return AgentResult(
-                    question=question,
-                    answer=content.strip(),
-                    steps=step,
-                    success=True,
-                    tool_calls=tool_calls_count,
+                return self._finish_run(
+                    AgentResult(
+                        question=question,
+                        answer=content.strip(),
+                        steps=step,
+                        success=True,
+                        tool_calls=tool_calls_count,
+                    ),
+                    run_log,
                 )
 
-            return AgentResult(
-                question=question,
-                answer=(
-                    "Model không trả về câu trả lời cuối cùng hợp lệ. "
-                    f"finish_reason={finish_reason}"
+            return self._finish_run(
+                AgentResult(
+                    question=question,
+                    answer=(
+                        "Model không trả về câu trả lời cuối cùng hợp lệ. "
+                        f"finish_reason={finish_reason}"
+                    ),
+                    steps=step,
+                    success=False,
+                    tool_calls=tool_calls_count,
                 ),
-                steps=step,
-                success=False,
-                tool_calls=tool_calls_count,
+                run_log,
             )
 
-        return AgentResult(
-            question=question,
-            answer=(
-                f"Agent đã đạt giới hạn {self.max_steps} bước "
-                "mà chưa hoàn thành yêu cầu."
+        return self._finish_run(
+            AgentResult(
+                question=question,
+                answer=(
+                    f"Agent đã đạt giới hạn {self.max_steps} bước "
+                    "mà chưa hoàn thành yêu cầu."
+                ),
+                steps=self.max_steps,
+                success=False,
+                tool_calls=tool_calls_count,
             ),
-            steps=self.max_steps,
-            success=False,
-            tool_calls=tool_calls_count,
+            run_log,
         )

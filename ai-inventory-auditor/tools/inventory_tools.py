@@ -4,6 +4,8 @@ from typing import Any
 from business.inventory_service import InventoryService
 from business.audit_service import AuditService
 from storage.audit_repository import AuditRepository
+from pathlib import Path
+from functools import cached_property
 
 
 class InventoryTools:
@@ -13,6 +15,60 @@ class InventoryTools:
         self.inventory_service = InventoryService()
         self.audit_service = AuditService()
         self.audit_repository = AuditRepository()
+
+    @cached_property
+    def rag_pipeline(self):
+        """Nạp kho tài liệu một lần, chỉ khi tool tìm chính sách được gọi."""
+        from config import DATA_DIR
+        from retrieval.rag_pipeline import RAGPipeline
+
+        return RAGPipeline.from_directory(DATA_DIR / "documents")
+
+    def search_inventory_policy(
+        self, query: str, top_k: int = 3, search_mode: str = "hybrid",
+        min_score: float = 0.25,
+    ) -> dict[str, Any]:
+        """Tra cứu chính sách và trả bằng chứng có doc_id/version/date."""
+        if not query or not query.strip():
+            raise ValueError("query không được để trống")
+        if not 1 <= top_k <= 10:
+            raise ValueError("top_k phải nằm trong khoảng 1..10")
+        if not 0 <= min_score <= 1:
+            raise ValueError("min_score phải nằm trong khoảng 0..1")
+
+        evidence = self.rag_pipeline.retrieve(
+            query, top_k=top_k, search_mode=search_mode, min_score=min_score,
+        )
+        selected = evidence
+        # Giữ kết quả có điểm cao, nhưng loại đoạn trùng cùng doc/chunk.
+        seen = set()
+        results = []
+        for item in selected:
+            key = (item.doc_id, item.chunk_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            results.append({
+                "doc_id": item.doc_id,
+                "title": item.title,
+                "version": item.metadata.get("version", "unknown"),
+                "date": item.metadata.get("date", "unknown"),
+                "chunk_id": item.chunk_id,
+                "score": round(float(item.score), 4),
+                "content": item.content,
+            })
+            if len(results) >= top_k:
+                break
+
+        return {
+            "query": query,
+            "search_mode": search_mode,
+            "min_score": min_score,
+            "evidence_count": len(results),
+            "doc_ids": list(dict.fromkeys(item["doc_id"] for item in results)),
+            "evidence": results,
+            "message": "Không tìm thấy bằng chứng phù hợp." if not results else "Đã truy xuất bằng chứng chính sách.",
+        }
 
     def get_stock_data(self, product_id: str) -> dict[str, Any]:
         """Lấy dữ liệu tồn kho và độ lệch của một sản phẩm."""
@@ -30,6 +86,15 @@ class InventoryTools:
         raise TypeError(
             "InventoryService trả về kiểu dữ liệu không được hỗ trợ."
         )
+
+    def get_transactions(self, product_id: str) -> dict[str, Any]:
+        """Liệt kê giao dịch của một sản phẩm kèm trạng thái và việc có được tính vào tồn kho."""
+        rows = self.inventory_service.get_transactions(product_id)
+        return {
+            "product_id": product_id.strip().upper(),
+            "transaction_count": len(rows),
+            "transactions": rows,
+        }
 
     def get_all_stock_data(self) -> list[dict[str, Any]]:
         """Lấy dữ liệu tồn kho của tất cả sản phẩm."""
@@ -57,7 +122,7 @@ class InventoryTools:
         reason: str,
     ) -> dict[str, Any]:
         """Tạo phiếu kiểm toán qua AuditService."""
-        result = self.audit_service.audit_product(product_id)
+        result = self.audit_service.audit_product(product_id, reason=reason)
 
         if not result.get("audit_created"):
             return {
@@ -80,12 +145,11 @@ class InventoryTools:
                 ),
             }
 
-        # Lý do được cung cấp bởi người gọi tool.
-        # Không tự suy luận nguyên nhân chênh lệch.
+        # Lý do phải được lấy từ bản ghi đã đọc lại, không chỉ từ input.
         return {
             "success": True,
             "product_id": product_id,
-            "reason": reason,
+            "reason": audit.get("reason", reason) if isinstance(audit, dict) else reason,
             "audit": audit,
             "message": "Đã yêu cầu tạo phiếu kiểm toán.",
         }
@@ -123,6 +187,8 @@ def build_tool_registry(
     return {
         "get_stock_data": inventory_tools.get_stock_data,
         "get_all_stock_data": inventory_tools.get_all_stock_data,
+        "get_transactions": inventory_tools.get_transactions,
+        "search_inventory_policy": inventory_tools.search_inventory_policy,
         "create_audit_request": inventory_tools.create_audit_request,
         "get_audit_request": inventory_tools.get_audit_request,
     }

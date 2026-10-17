@@ -11,7 +11,10 @@ def matches_metadata(chunk: DocumentChunk, metadata_filter: dict | None) -> bool
         return True
     for field, expected in metadata_filter.items():
         actual = chunk.doc_id if field == "doc_id" else chunk.metadata.get(field)
-        if actual != expected:
+        if isinstance(expected, (list, tuple, set, frozenset)):
+            if actual not in expected:
+                return False
+        elif actual != expected:
             return False
     return True
 

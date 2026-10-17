@@ -4,6 +4,8 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
 
+from business.policy_service import PolicyService
+
 
 # Thư mục gốc: ai-inventory-auditor/
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -25,6 +27,7 @@ class InventoryResult:
     variance: Optional[float]
     severity: str
     unit: str
+    data_quality_flag: Optional[str] = None
 
 
 def _read_csv(file_path: Path) -> list[dict]:
@@ -57,6 +60,7 @@ class InventoryService:
     ):
         self.products_file = Path(products_file)
         self.transactions_file = Path(transactions_file)
+        self.policy_service = PolicyService()
 
     def get_stock_data(self, product_id: str) -> InventoryResult:
         """Tính tồn kho dự kiến và chênh lệch cho một sản phẩm."""
@@ -114,6 +118,9 @@ class InventoryService:
 
         expected_stock = opening_stock + total_in - total_out
 
+        # Tồn dự kiến âm là bất thường dữ liệu (INV-DOC-009): gắn cờ, không tự sửa.
+        data_quality_flag = "NEGATIVE_EXPECTED_STOCK" if expected_stock < 0 else None
+
         # Nếu chưa kiểm đếm thực tế thì không tính variance.
         raw_count = product.get("physical_count", "")
         if raw_count is None or not raw_count.strip():
@@ -124,12 +131,7 @@ class InventoryService:
             physical_count = _number(raw_count, "physical_count")
             variance = physical_count - expected_stock
 
-            if variance == 0:
-                severity = "NONE"
-            elif abs(variance) >= 10:
-                severity = "HIGH"
-            else:
-                severity = "NORMAL"
+            severity = self.policy_service.classify_variance(variance)
 
         return InventoryResult(
             product_id=product_id,
@@ -143,7 +145,30 @@ class InventoryService:
             variance=variance,
             severity=severity,
             unit=product["unit"],
+            data_quality_flag=data_quality_flag,
         )
+
+    def get_transactions(self, product_id: str) -> list[dict]:
+        """Đọc giao dịch của một sản phẩm (kể cả DRAFT) để giải thích tồn kho."""
+        product_id = product_id.strip().upper()
+        products = _read_csv(self.products_file)
+        if not any(row["product_id"].strip().upper() == product_id for row in products):
+            raise ValueError(f"Không tìm thấy sản phẩm: {product_id}")
+
+        rows = []
+        for row in _read_csv(self.transactions_file):
+            if row["product_id"].strip().upper() != product_id:
+                continue
+            status = row["status"].strip().upper()
+            rows.append({
+                "transaction_id": row["transaction_id"].strip(),
+                "transaction_type": row["transaction_type"].strip().upper(),
+                "quantity": _number(row["quantity"], "quantity"),
+                "transaction_date": row["transaction_date"].strip(),
+                "status": status,
+                "counted_in_stock": status == "POSTED",
+            })
+        return rows
 
     def get_all_stock_data(self) -> list[InventoryResult]:
         """Tính tồn kho cho tất cả sản phẩm."""

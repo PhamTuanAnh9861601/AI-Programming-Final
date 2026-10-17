@@ -1,0 +1,13 @@
+{
+  "status": "not_run_after_project_fixes",
+  "timestamp": null,
+  "testset": "data/tests/testset.jsonl",
+  "total": 18,
+  "run": 0,
+  "passed": 0,
+  "failed": 0,
+  "errors": 0,
+  "skipped": 0,
+  "pass_rate_on_run": null,
+  "note": "Chưa chạy evaluation end-to-end sau các sửa đổi. Chạy `python evaluation/evaluate.py` trong môi trường đã cài requirements và có GROQ_API_KEY để tạo báo cáo thật."
+}

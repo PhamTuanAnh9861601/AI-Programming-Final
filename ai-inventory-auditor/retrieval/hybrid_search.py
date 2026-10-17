@@ -36,14 +36,14 @@ def hybrid_search(
     w_vector: float = 0.7,
     min_score: float | None = None,
 ) -> list[tuple[DocumentChunk, float]]:
-    
+
     """Xếp hạng đoạn theo điểm BM25 và cosine có trọng số, có thể lọc metadata."""
     if top_k < 1 or not query.strip():
         return []
-    
+
     if w_bm25 < 0 or w_vector < 0 or w_bm25 + w_vector <= 0:
         raise ValueError("Search weights must be non-negative and have a positive sum")
-    
+
     chunks = list(
         chunks_or_store.chunks.values()
 
@@ -76,7 +76,7 @@ def hybrid_search(
     ranked = []
     for chunk, keyword_score, vector_score in zip(eligible, bm25_norm, vector_scores):
         score = w_bm25 * keyword_score + w_vector * vector_score
-        
+
         if min_score is None or score >= min_score:
             ranked.append((chunk, score))
     ranked.sort(key=lambda item: (-item[1], item[0].doc_id, item[0].chunk_index))

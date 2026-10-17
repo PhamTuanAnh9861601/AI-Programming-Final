@@ -106,3 +106,12 @@ class TestAuditService(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class NegativeStockAuditTests(unittest.TestCase):
+    def test_flagged_product_does_not_create_ticket(self):
+        service = AuditService()
+        service.audit_repository = Mock()
+        result = service.audit_product("SP038")
+        self.assertFalse(result["audit_created"])
+        service.audit_repository.create.assert_not_called()
