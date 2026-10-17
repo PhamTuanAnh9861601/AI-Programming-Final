@@ -70,3 +70,19 @@ class TransactionsToolTests(unittest.TestCase):
     def test_unknown_product_raises(self):
         with self.assertRaises(ValueError):
             InventoryService().get_transactions("SP999")
+
+
+class DataQualityNoteTests(unittest.TestCase):
+    def test_note_only_present_for_flagged_product(self):
+        from tools.inventory_tools import InventoryTools
+        tools = InventoryTools()
+        self.assertIn("data_quality_note", tools.get_stock_data("SP038"))
+        self.assertNotIn("data_quality_note", tools.get_stock_data("SP001"))
+
+
+class MinEvidenceAndNoteTests(unittest.TestCase):
+    def test_transactions_note_only_for_negative_stock_product(self):
+        from tools.inventory_tools import InventoryTools
+        tools = InventoryTools()
+        self.assertIn("data_quality_note", tools.get_transactions("SP038"))
+        self.assertNotIn("data_quality_note", tools.get_transactions("SP001"))

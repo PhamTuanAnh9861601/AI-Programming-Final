@@ -5,7 +5,10 @@ from business.inventory_service import InventoryService
 from business.audit_service import AuditService
 from storage.audit_repository import AuditRepository
 from pathlib import Path
-from functools import cached_property
+import threading
+
+
+MIN_EVIDENCE = 5  # số đoạn bằng chứng tối thiểu mỗi lần tra cứu
 
 
 class InventoryTools:
@@ -15,29 +18,49 @@ class InventoryTools:
         self.inventory_service = InventoryService()
         self.audit_service = AuditService()
         self.audit_repository = AuditRepository()
+        self._rag_pipeline = None
+        self._rag_lock = threading.Lock()
 
-    @cached_property
+    @property
     def rag_pipeline(self):
-        """Nạp kho tài liệu một lần, chỉ khi tool tìm chính sách được gọi."""
-        from config import DATA_DIR
-        from retrieval.rag_pipeline import RAGPipeline
+        """Nạp kho tài liệu một lần (an toàn khi nhiều luồng gọi cùng lúc)."""
+        if self._rag_pipeline is None:
+            with self._rag_lock:
+                if self._rag_pipeline is None:
+                    from config import CHUNK_MODE, DATA_DIR, EMBEDDING_MODEL
+                    from retrieval.rag_pipeline import RAGPipeline
 
-        return RAGPipeline.from_directory(DATA_DIR / "documents")
+                    self._rag_pipeline = RAGPipeline.from_directory(
+                        DATA_DIR / "documents",
+                        model_name=EMBEDDING_MODEL,
+                        chunk_mode=CHUNK_MODE,
+                    )
+        return self._rag_pipeline
+
+    def warm_up(self) -> None:
+        """Nạp sẵn mô hình embedding và chỉ mục để câu hỏi đầu tiên không bị chậm."""
+        _ = self.rag_pipeline
 
     def search_inventory_policy(
-        self, query: str, top_k: int = 3, search_mode: str = "hybrid",
-        min_score: float = 0.25,
+        self, query: str, top_k: int = 3, search_mode: str = "hybrid"
     ) -> dict[str, Any]:
         """Tra cứu chính sách và trả bằng chứng có doc_id/version/date."""
         if not query or not query.strip():
             raise ValueError("query không được để trống")
         if not 1 <= top_k <= 10:
             raise ValueError("top_k phải nằm trong khoảng 1..10")
-        if not 0 <= min_score <= 1:
-            raise ValueError("min_score phải nằm trong khoảng 0..1")
+        # Đoạn chứa câu trả lời hay xếp hạng 4-5; các đoạn rất ngắn nên trả tối thiểu 5.
+        top_k = max(top_k, MIN_EVIDENCE)
+
+        # Chọn phiên bản mới nhất theo metadata của toàn corpus trước retrieval,
+        # để bản cũ không thắng chỉ vì nó trùng từ khóa truy vấn hơn.
+        from config import RETRIEVAL_MIN_SCORE
+        from retrieval.rag_pipeline import current_doc_ids
 
         evidence = self.rag_pipeline.retrieve(
-            query, top_k=top_k, search_mode=search_mode, min_score=min_score,
+            query, top_k=max(top_k * 3, top_k), search_mode=search_mode,
+            metadata_filter={"doc_id": current_doc_ids(self.rag_pipeline.store)},
+            min_score=RETRIEVAL_MIN_SCORE,
         )
         selected = evidence
         # Giữ kết quả có điểm cao, nhưng loại đoạn trùng cùng doc/chunk.
@@ -63,7 +86,6 @@ class InventoryTools:
         return {
             "query": query,
             "search_mode": search_mode,
-            "min_score": min_score,
             "evidence_count": len(results),
             "doc_ids": list(dict.fromkeys(item["doc_id"] for item in results)),
             "evidence": results,
@@ -75,10 +97,16 @@ class InventoryTools:
         result = self.inventory_service.get_stock_data(product_id)
 
         if hasattr(result, "__dataclass_fields__"):
-            return {
+            data = {
                 field: getattr(result, field)
                 for field in result.__dataclass_fields__
             }
+            if data.get("data_quality_flag"):
+                data["data_quality_note"] = (
+                    "Tồn dự kiến âm là bất thường dữ liệu cần rà soát (INV-DOC-009, INV-DOC-011). "
+                    "Không suy ra nguyên nhân và không chỉ định giao dịch hay người chịu trách nhiệm."
+                )
+            return data
 
         if isinstance(result, dict):
             return result
@@ -90,11 +118,18 @@ class InventoryTools:
     def get_transactions(self, product_id: str) -> dict[str, Any]:
         """Liệt kê giao dịch của một sản phẩm kèm trạng thái và việc có được tính vào tồn kho."""
         rows = self.inventory_service.get_transactions(product_id)
-        return {
+        result = {
             "product_id": product_id.strip().upper(),
             "transaction_count": len(rows),
             "transactions": rows,
         }
+        if self.inventory_service.get_stock_data(product_id).data_quality_flag:
+            result["data_quality_note"] = (
+                "Sản phẩm này có tồn dự kiến âm (bất thường dữ liệu, INV-DOC-009/011). "
+                "Chỉ liệt kê dữ kiện; không tính số dư từng bước để chỉ ra giao dịch 'gây ra' "
+                "và không kết luận nguyên nhân hay người chịu trách nhiệm."
+            )
+        return result
 
     def get_all_stock_data(self) -> list[dict[str, Any]]:
         """Lấy dữ liệu tồn kho của tất cả sản phẩm."""

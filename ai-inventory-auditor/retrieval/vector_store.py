@@ -66,16 +66,17 @@ class VectorStore(DocumentStore):
     @classmethod
     def from_directory(
         cls, directory: str | Path, *, chunk_size: int = 150, overlap: int = 30,
-        model_name: str = DEFAULT_EMBEDDING_MODEL,
+        model_name: str = DEFAULT_EMBEDDING_MODEL, chunk_mode: str = "line",
     ) -> "VectorStore":
         document_store = DocumentStore.from_directory(
-            directory, chunk_size=chunk_size, overlap=overlap
+            directory, chunk_size=chunk_size, overlap=overlap, chunk_mode=chunk_mode
         )
         store = cls(
             documents=document_store.documents,
             chunks=document_store.chunks,
             chunk_size=chunk_size,
             overlap=overlap,
+            chunk_mode=chunk_mode,
             model_name=model_name,
         )
         all_chunks = list(store.chunks.values())
@@ -126,6 +127,7 @@ class VectorStore(DocumentStore):
             "model_name": self.model_name,
             "chunk_size": self.chunk_size,
             "overlap": self.overlap,
+            "chunk_mode": self.chunk_mode,
             "documents": [],
             "chunks": [],
         }
@@ -150,6 +152,7 @@ class VectorStore(DocumentStore):
         self.chunks = {}
         self.chunk_size = payload.get("chunk_size", 150)
         self.overlap = payload.get("overlap", 30)
+        self.chunk_mode = payload.get("chunk_mode", "fixed")
         for item in payload.get("documents", []):
             item["created_at"] = datetime.fromisoformat(item["created_at"])
             document = Document(**item)
