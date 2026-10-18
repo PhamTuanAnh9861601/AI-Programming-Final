@@ -1,45 +1,51 @@
-# AI Inventory Auditor
+# AI Usage Disclosure — AI Inventory Auditor (Group 10)
 
-Agent kiểm toán tồn kho dùng Groq native tool calling, MCP stdio, dịch vụ nghiệp vụ có kiểm soát, và RAG tra cứu tài liệu chính sách.
+## 1. Summary
 
-## Yêu cầu
-- Python 3.11+ (khuyến nghị)
-- Groq API key có quyền dùng model được cấu hình
-- Cài dependencies từ `requirements.txt`
+Most of this project was designed, written and debugged by the team by hand. By our own estimate, **about 60–70% of the work is our own**. AI was used as an assistant only for the areas listed in section 3. Every AI-assisted part was read, run and adapted by the team, and each member can explain the files they are responsible for.
 
-## Cài đặt
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-Copy-Item .env.example .env
-```
-Mở `.env`, điền `GROQ_API_KEY`. Không commit `.env` hoặc API key.
+The application also calls an LLM at runtime (Groq, `openai/gpt-oss-20b`) for tool selection and answer wording. This is a product feature, not development assistance. The model never reads the CSV files or the database directly: stock calculations and audit-ticket writes are done by deterministic Python services and SQLite.
 
-## Chạy demo
-```powershell
-python app.py
-```
-MCP client chạy server qua stdio, tự discover tools/schema, rồi đưa schema đó cho AgentLoop. Ví dụ câu hỏi đọc-only: `Kiểm tra tồn kho SP001`. Muốn ghi phiếu phải yêu cầu rõ ràng, ví dụ `Tạo phiếu kiểm toán cho SP001 vì có chênh lệch tồn kho`.
+## 2. AI tools used
 
-## Test và evaluation
-```powershell
-python -m unittest tests.test_inventory_service tests.test_audit_service tests.test_agent_loop -v
-python evaluation/evaluate.py
-```
-Evaluation dùng `data/tests/testset.jsonl`, đi qua MCP và lưu báo cáo tại `evaluation/results.json`. Bộ test chứa ca tính toán, chính sách nhiều phiên bản, dữ liệu thiếu, suy luận cần nhiều tài liệu và câu cần từ chối. Một số ca có thể thất bại; không sửa kết quả chỉ để đạt 100%.
+| Tool | Used for |
+|---|---|
+| ChatGPT | Suggestions for the five areas in section 3 |
+| Claude | Suggestions for the five areas in section 3; drafting the report (structure and text, using the team's code, logs and evaluation results) and this disclosure file |
+| OpenAI Codex | Final review and packaging pass only: checking the submission, aligning README / report / evaluation paths with the saved results |
 
-## Makefile
-Trên môi trường có GNU Make: `make setup`, `make demo`, `make eval`, `make test`. Trên Windows PowerShell, các lệnh Python phía trên tương đương và không yêu cầu cài Make.
+## 3. Where AI was used
 
-## Thiết kế
-- `agent/agent_loop.py`: vòng lặp tool calling, quyền ghi, giới hạn bước, retry/timeout do client API cấu hình, log usage.
-- `tools/mcp_client.py`, `mcp_server/server.py`: MCP stdio và schema discovery.
-- `tools/inventory_tools.py`: adapter nghiệp vụ và search policy RAG.
-- `business/`, `storage/`: tính tồn kho, kiểm soát phiếu, SQLite và verify sau ghi.
-- `retrieval/`, `data/documents/`: chunking ký tự với overlap 30 ký tự để giảm mất ngữ cảnh ở ranh giới; dense cosine và hybrid BM25 + vector.
-- `evaluation/`: pass/fail theo tiêu chí, recall doc_id và faithfulness proxy. Proxy chỉ là chỉ số tự động sơ bộ, không thay thế đánh giá ngữ nghĩa của người chấm.
+| # | Area | Files | How AI helped |
+|---|---|---|---|
+| 1 | Test cases | `tests/*.py`, `tests/testset.jsonl` | Suggested test cases and edge cases (missing `physical_count`, variance 0 / 9 / 10, DRAFT vs POSTED, no_answer questions) |
+| 2 | Flow skeleton | `agent/agent_loop.py` | Suggested the outline of the flow (question → tool call → observation → answer, verify after write). Used as a suggestion only |
+| 3 | Database data | `data/products.csv`, `data/transactions.csv`, `data/sample_audit_history.csv` | Helped produce and structure the sample data |
+| 4 | Database-write business logic | `business/audit_service.py`, `storage/audit_repository.py`, `storage/database.py` | Helped with the rules and code for creating an audit ticket and saving it to SQLite (guards, idempotency, read-back) |
+| 5 | System prompt file | `agent/prompt/system_prompt.txt` | Helped draft the prompt rules |
+| 6 | Report | `report.docx` | Claude drafted the structure and text from the team's code, logs and results; the team added its own screenshots, corrected and verified the content |
 
-## Log và bảo mật
-Mỗi lượt chạy ghi `logs/agent_runs.jsonl`, `logs/agent_runs_pretty.json` và một JSONL riêng trong `logs/per_run/`. Log gồm prompt/completion/total tokens, `max_prompt`, tool arguments/results và câu trả lời. Kiểm tra log trước khi nộp, loại bỏ thông tin nhạy cảm nếu có. Không đưa `.env`, database runtime hoặc dữ liệu cá nhân vào Git.
+Written by the team without AI assistance: the rest of the agent loop (step limit, write gate, retry, logging), the RAG pipeline (`retrieval/*`), the MCP server and client (`mcp_server/*`, `tools/*`), and the evaluation scripts (`evaluation/*`).
+
+## 4. Prompts
+
+We did not keep the verbatim prompts. Representative summaries:
+
+1. Test cases: "Suggest test cases for an inventory audit agent, including missing data, boundary values and questions with no answer."
+2. Flow: "Suggest the flow for an agent that answers inventory questions with tools and creates an audit ticket, then verifies it."
+3. Data: "Create sample products and transactions with POSTED / DRAFT / CANCELLED / REJECTED statuses."
+4. Database write: "Write the logic to create an audit ticket in SQLite and read it back to verify."
+5. System prompt: "Write system-prompt rules for an inventory audit agent: cite sources, refuse when evidence is missing, write only on explicit request."
+
+## 5. Human review and responsibility
+
+- The team reviewed, ran and modified the AI-assisted parts. We ran `make test` and `make eval`; results are in `evaluation/results.json`.
+- We do not claim any file as AI-generated beyond what is listed above.
+- The metric `faithfulness_proxy` is a citation-presence heuristic, not a human-validated faithfulness score.
+
+## 6. Per-member declaration
+
+| Member | AI-assisted parts | Parts written by the member |
+|---|---|---|
+| Phạm Tuấn Anh (24110076) | Areas 1–5 in section 3: test case suggestions, flow outline (as a suggestion), sample data, audit-ticket write logic, system prompt drafting | Agent loop details, business logic, storage, evaluation, tests, datasets, app/config; reviewed and adapted all AI suggestions |
+| Hoàng Thị Thu Trang (24110139) | None. The areas in section 3 are outside her modules | Retrieval, `eval_retrieval.py`, MCP server, MCP tools/client |

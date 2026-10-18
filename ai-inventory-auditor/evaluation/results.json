@@ -1,6 +1,6 @@
 {
   "timestamp": "2026-10-17T21:26:37.789754+00:00",
-  "testset": "C:\\Users\\Admin\\AIproj\\ai-inventory-auditor\\data\\tests\\testset.jsonl",
+  "testset": "tests/testset.jsonl",
   "total": 18,
   "run": 18,
   "passed": 17,

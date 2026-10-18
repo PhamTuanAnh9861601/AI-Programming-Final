@@ -3,7 +3,7 @@
 Fictional coursework data, not real company data.
 
 ## Contents
-- `documents/`: 8 policy/data-dictionary documents with doc_id, title, version, date and owner.
+- `documents/`: 11 policy/data-dictionary documents with doc_id, title, version, date and owner.
 - `products.csv`: 44 products across seven categories.
 - `transactions.csv`: 245 stock movements with POSTED, DRAFT, CANCELLED and REJECTED statuses.
 - `sample_audit_history.csv`: two example audit records. Your application should create new records in its SQLite DB.
@@ -28,5 +28,5 @@ Fictional coursework data, not real company data.
 ## Dataset v2 additions
 - `data_quality_issues.csv` lists negative expected-stock cases for investigation; do not auto-correct them.
 - `documents/INV-DOC-009` through `INV-DOC-011` add data-quality, evidence, and escalation rules with metadata.
-- `tests/testset.jsonl` has 16 draft evaluation cases including 5 `no_answer` cases. Confirm the schema expected by `evaluation/evaluate.py` before using it.
+- `tests/testset.jsonl` has 18 evaluation cases including 6 `no_answer` cases; both evaluation commands read this canonical testset.
 - `analysis_questions.md` lists useful analyses; `DATASET_CHANGELOG.md` documents the duplicate transaction ID repair.

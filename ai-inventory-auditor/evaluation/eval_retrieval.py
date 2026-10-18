@@ -23,7 +23,7 @@ from retrieval.rag_pipeline import RAGPipeline, current_doc_ids  # noqa: E402
 from retrieval.vector_store import VectorStore  # noqa: E402
 
 DOCUMENTS_DIR = ROOT / "data" / "documents"
-TESTSET_PATH = ROOT / "data" / "tests" / "testset.jsonl"
+TESTSET_PATH = ROOT / "tests" / "testset.jsonl"
 OUTPUT_PATH = ROOT / "evaluation" / "retrieval_results.json"
 # Câu tính toán thuần số liệu không cần tài liệu để trả lời nên không đưa vào hit@k.
 SKIP_CATEGORIES = {"calculation"}

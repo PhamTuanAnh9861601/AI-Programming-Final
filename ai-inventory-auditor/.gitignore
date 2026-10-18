@@ -3,7 +3,6 @@ __pycache__/
 .venv/
 .env
 *.db
-logs/
 data/*.db
 evaluation/results_partial.json
 evaluation/results_regraded.json

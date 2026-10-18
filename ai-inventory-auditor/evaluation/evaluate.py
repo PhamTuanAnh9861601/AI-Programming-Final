@@ -1,4 +1,4 @@
-"""Evaluate AgentLoop through MCP against data/tests/testset.jsonl."""
+"""Evaluate AgentLoop through MCP against tests/testset.jsonl."""
 
 import argparse
 import json
@@ -17,7 +17,7 @@ from tools.mcp_client import MCPClient
 from agent.agent_loop import AgentLoop
 from evaluation.metrics import faithfulness_proxy, citation_doc_ids
 
-TESTSET_PATH = ROOT / "data" / "tests" / "testset.jsonl"
+TESTSET_PATH = ROOT / "tests" / "testset.jsonl"
 RESULT_PATH = ROOT / "evaluation" / "results.json"
 INCOMPLETE_PATH = ROOT / "evaluation" / "results_incomplete.json"  # lần chạy đầy đủ có lỗi
 PARTIAL_PATH = ROOT / "evaluation" / "results_partial.json"      # khi chỉ chạy một số câu

@@ -12,7 +12,7 @@
 - `data_quality_issues.csv`: danh sách sản phẩm có tồn dự kiến âm sau khi chỉ tính giao dịch POSTED. Đây là bất thường cần điều tra, không phải lý do tự sửa số liệu.
 - Thêm `INV-DOC-009`, `INV-DOC-010`, `INV-DOC-011`, mỗi tài liệu có DOC_ID, TITLE, VERSION, DATE, OWNER.
 - `analysis_questions.md`: các nhóm vấn đề có thể khai thác từ dữ liệu.
-- `tests/testset.jsonl`: 16 câu kiểm thử gợi ý, gồm 5 câu no_answer. Cần đồng bộ field names với `evaluation/evaluate.py` hiện tại trước khi coi là chạy được trực tiếp.
+- `tests/testset.jsonl`: 18 câu kiểm thử, gồm 6 câu no_answer. Đây là testset chuẩn được cả hai lệnh evaluation sử dụng.
 
 ## Phát hiện sơ bộ
 - Products: 44; transactions: 245.
